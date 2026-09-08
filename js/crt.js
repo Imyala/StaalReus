@@ -13,10 +13,13 @@ GH.crt = (function () {
 
   var LEVELS = {
     // maskType 0: two-phase magenta/green grille (soft), 1: full RGB aperture grille
+    // film: no tube at all — a soft halation glow, a colour grade (lifted
+    // contrast, richer saturation, warm lights / cool shadows) and a vignette
+    film: { curve: 0, scan: 0, mask: 0, maskType: 0, glow: 0.16, aberr: 0, vig: 0.26, grade: 1 },
     subtle: { curve: 0.025, scan: 0.40, mask: 0.12, maskType: 0, glow: 0.05, aberr: 0.10, vig: 0.08 },
     strong: { curve: 0.06, scan: 0.80, mask: 0.35, maskType: 1, glow: 0.20, aberr: 0.60, vig: 0.16 }
   };
-  var level = 'subtle';
+  var level = 'film';
 
   var uniforms = {
     tDiffuse: { value: null },
@@ -24,7 +27,7 @@ GH.crt = (function () {
     uOut: { value: new THREE.Vector2(960, 540) },   // canvas size
     uCurve: { value: 0 }, uScan: { value: 0 }, uMask: { value: 0 },
     uGlow: { value: 0 }, uAberr: { value: 0 }, uVig: { value: 0 },
-    uMaskType: { value: 0 }, uGain: { value: 1 }
+    uMaskType: { value: 0 }, uGain: { value: 1 }, uGrade: { value: 0 }
   };
 
   var VERT = [
@@ -36,7 +39,7 @@ GH.crt = (function () {
     'uniform sampler2D tDiffuse;',
     'uniform vec2 uSrc;',
     'uniform vec2 uOut;',
-    'uniform float uCurve, uScan, uMask, uGlow, uAberr, uVig, uMaskType, uGain;',
+    'uniform float uCurve, uScan, uMask, uGlow, uAberr, uVig, uMaskType, uGain, uGrade;',
     'varying vec2 vUv;',
     '',
     // barrel distortion: the picture bows outward the way glass tubes do
@@ -107,6 +110,18 @@ GH.crt = (function () {
     '  }',
     '  col *= mask;',
     '',
+    // the film grade: a touch more contrast and saturation, highlights
+    // pushed warm and shadows cool, a soft roll-off so bright steel and
+    // muzzle flashes bloom instead of clipping
+    '  if (uGrade > 0.0) {',
+    '    float l = luma(col);',
+    '    col = mix(vec3(l), col, 1.0 + 0.22 * uGrade);',
+    '    col = (col - 0.5) * (1.0 + 0.14 * uGrade) + 0.5;',
+    '    col += (l - 0.45) * vec3(0.05, 0.01, -0.06) * uGrade;',
+    '    col = max(col, 0.0);',
+    '    col = col / (1.0 + col * 0.12 * uGrade) * (1.0 + 0.12 * uGrade);',
+    '  }',
+    '',
     // give back what the gaps and mask took, then darken the corners
     '  col *= uGain;',
     '  float v = 16.0 * uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y);',
@@ -139,6 +154,7 @@ GH.crt = (function () {
     uniforms.uCurve.value = L.curve; uniforms.uScan.value = L.scan; uniforms.uMask.value = L.mask;
     uniforms.uGlow.value = L.glow; uniforms.uAberr.value = L.aberr; uniforms.uVig.value = L.vig;
     uniforms.uMaskType.value = L.maskType;
+    uniforms.uGrade.value = L.grade || 0;
     // gain roughly restores mid-tone brightness lost to the gaps and the mask,
     // held a little under 1:1 so highlights keep their contrast
     var scanAvg = 1.0 - 0.32 * L.scan;
@@ -150,7 +166,7 @@ GH.crt = (function () {
   M.setEnabled = function (on) { enabled = !!on && !failed; return enabled; };
   M.active = function () { return enabled; };
   M.failed = function () { return failed; };
-  M.setLevel = function (name) { level = LEVELS[name] ? name : 'subtle'; if (mat) applyLevel(); };
+  M.setLevel = function (name) { level = LEVELS[name] ? name : 'film'; if (mat) applyLevel(); };
   M.levels = function () { return Object.keys(LEVELS); };
 
   // rw/rh: the low-res scene size, w/h: the canvas size

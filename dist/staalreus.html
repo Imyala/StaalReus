@@ -824,6 +824,30 @@ body.looking #crosshair { opacity: 0.4; }
   z-index: 40;
 }
 #zone-fade.on { opacity: 1; transition: opacity 0.05s; }
+#zone-fade-text {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  text-align: center; font-family: var(--font-head); font-weight: bold;
+  color: var(--parchment); text-shadow: 0 0 18px rgba(226, 178, 92, 0.35), 2px 2px 0 #000;
+}
+.zf-dir { font-size: 15px; letter-spacing: 4px; color: var(--brass); margin-bottom: 8px; }
+.zf-name { font-size: 40px; letter-spacing: 6px; }
+.zf-name::after { content: ''; display: block; width: 60%; height: 1px; margin: 12px auto 0; background: linear-gradient(90deg, transparent, var(--bronze), transparent); }
+
+/* the zone compass: what lies through each corner portal */
+#zone-compass {
+  position: absolute; right: 14px; bottom: 182px;
+  width: 160px; padding: 4px 6px;
+  background: rgba(8, 6, 4, 0.78);
+  border: 1px solid var(--bronze2); box-shadow: 0 0 0 1px #000;
+  font-family: var(--font-body); font-size: 10px; line-height: 14px;
+  color: var(--parch2); pointer-events: none;
+}
+.zc-row { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; overflow: hidden; }
+.zc-arrow { color: #60c8ff; font-weight: bold; width: 12px; }
+.zc-name { flex: 1; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.5px; }
+.zc-danger { color: #c86060; font-size: 9px; }
+.zc-none { opacity: 0.4; }
+.zc-none .zc-arrow { color: var(--dim); }
 
 /* ---------------- target combat + abilities ---------------- */
 
@@ -867,8 +891,29 @@ body.looking #crosshair { opacity: 0.4; }
 #map-zones {
   display: grid; grid-template-columns: repeat(3, 300px);
   gap: 10px; justify-content: center;
-  max-height: 62vh; overflow-y: auto; padding: 4px;
+  max-height: 40vh; overflow-y: auto; padding: 4px;
 }
+/* the Reach drawn as a map: five columns, corners touching corners */
+#map-grid {
+  display: grid; grid-template-columns: repeat(5, 128px); grid-auto-rows: 40px;
+  gap: 4px; justify-content: center; margin-bottom: 10px;
+  background: var(--hatch), rgba(10, 8, 6, 0.6); padding: 8px; border: 1px solid var(--seam);
+}
+.mg-tile {
+  position: relative; display: flex; flex-direction: column; justify-content: center;
+  padding: 0 6px; border: 1px solid var(--bronze2);
+  background: linear-gradient(rgba(38, 32, 24, 0.95), rgba(18, 15, 11, 0.98));
+  font-family: var(--font-head); font-size: 10px; letter-spacing: 0.5px; color: var(--parchment);
+  text-shadow: 1px 1px 0 #000; overflow: hidden; cursor: default;
+}
+.mg-tile .mg-danger { font-family: var(--font-body); font-size: 9px; color: #c86060; }
+.mg-tile.here { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold), 0 0 12px rgba(242, 207, 122, 0.35); }
+.mg-tile.here::after { content: 'YOU ARE HERE'; position: absolute; right: 4px; top: 2px; font-size: 7px; color: var(--gold); letter-spacing: 1px; }
+.mg-tile.next { border-color: #60c8ff; }
+.mg-tile .mg-hunt { position: absolute; right: 4px; bottom: 2px; font-size: 9px; color: #ffb060; }
+.mg-tile.hub { background: linear-gradient(rgba(60, 48, 28, 0.95), rgba(28, 22, 12, 0.98)); }
+.mg-empty { border: 1px dashed rgba(90, 74, 48, 0.25); }
+.mg-note { grid-column: 1 / -1; font-family: var(--font-body); font-size: 10px; color: var(--dim); text-align: center; line-height: 14px; }
 .mp-zone { background: linear-gradient(rgba(38, 32, 24, 0.92), rgba(18, 15, 11, 0.95)); border: 1px solid var(--seam); padding: 8px 10px; text-align: left; }
 .mp-name { font-family: var(--font-head); font-weight: bold; font-size: 15px; color: var(--parchment); text-shadow: 1px 1px 0 #000; }
 .mp-danger { color: #c86060; font-size: 11px; }
@@ -1201,7 +1246,7 @@ body.looking #crosshair { opacity: 0.4; }
 <div id="game-root">
   <canvas id="game-canvas"></canvas>
   <div id="crt-overlay"></div>
-  <div id="zone-fade"></div>
+  <div id="zone-fade"><div id="zone-fade-text" class="hidden"></div></div>
 
   <!-- ===================== HUD (during play) ===================== -->
   <div id="hud" class="hidden">
@@ -1253,6 +1298,7 @@ body.looking #crosshair { opacity: 0.4; }
     <div id="interact-line" class="hidden"></div>
     <div id="hotbar"></div>
     <canvas id="minimap" class="hidden" width="176" height="176"></canvas>
+    <div id="zone-compass" class="hidden"></div>
     <div id="race-hud" class="hidden">
       <div id="race-lap"></div>
       <div id="race-time"></div>
@@ -1444,7 +1490,7 @@ body.looking #crosshair { opacity: 0.4; }
   <!-- ===================== WORLD MAP ===================== -->
   <div id="map-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-map-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">THE&nbsp;SHATTERED&nbsp;REACH</h2><span class="esc-hint">ESC closes</span></div>
-    <div class="screen-sub wide">Every territory, its dungeons, today\'s weather and its DIARY. Why: diary tiers pay alloy and cores, and HARD/ELITE add a permanent perk in that zone.</div>
+    <div class="screen-sub wide">Every territory, its dungeons, today's weather and its DIARY. Why: diary tiers pay alloy and cores, and HARD/ELITE add a permanent perk in that zone.</div>
     <div id="map-head"></div>
     <div id="map-zones"></div>
   </div>
@@ -1536,8 +1582,8 @@ body.looking #crosshair { opacity: 0.4; }
         <label class="ct-set">Mouse look sensitivity <input type="range" id="set-sens" min="20" max="300" step="10"> <span id="set-sens-val">100%</span></label>
         <label class="ct-set"><input type="checkbox" id="set-invert"> Invert vertical look</label>
         <label class="ct-set">Camera <select id="set-cam"><option value="chase">Chase (MMO)</option><option value="top">Tactical (top-down)</option></select></label>
-        <label class="ct-set"><input type="checkbox" id="set-crt"> CRT shader (scanlines, phosphor mask, glow, curve)</label>
-        <label class="ct-set">CRT strength <select id="set-crt-level"><option value="subtle">Subtle</option><option value="strong">Strong</option></select></label>
+        <label class="ct-set"><input type="checkbox" id="set-crt"> Screen shader (film grade or CRT tube)</label>
+        <label class="ct-set">Screen look <select id="set-crt-level"><option value="film">Film — glow, vignette, grade (default)</option><option value="subtle">CRT — subtle scanlines</option><option value="strong">CRT — strong tube</option></select></label>
         <label class="ct-set"><input type="checkbox" id="set-mute"> Mute sound</label>
         <label class="ct-set">Music volume <input type="range" id="set-music" min="0" max="100" step="5"> <span id="set-music-val"></span></label>
         <label class="ct-set">Effects volume <input type="range" id="set-sfx" min="0" max="100" step="5"> <span id="set-sfx-val"></span></label>
@@ -1628,6 +1674,32 @@ GH.weightedPick = function (arr) {
     if (r <= 0) return arr[i];
   }
   return arr[arr.length - 1];
+};
+
+// COMBAT PACE — one dial for how fast a fight moves. The Reach was tuned
+// for deliberate, one-body-at-a-time combat; this pulls it toward the
+// arcade mech games (Gun Metal's boost-and-strafe cadence): quicker
+// triggers, faster rounds, longer dashes, hostiles that wake sooner and
+// close faster, and less hull per body so kills land in bursts. Every
+// frame keeps its relative balance (tools/balance.js reads the raw defs).
+GH.PACE = {
+  atkSpd: 1.3,       // primary (and vehicle strafe) cycle rate
+  projSpd: 1.35,     // player rounds fly faster ...
+  projLife: 0.82,    // ... and live a little shorter, so range grows ~10%
+  moveSpd: 1.12,     // frame walking speed
+  dashSpd: 34,       // boost dash units per second (was 26)
+  boostRegen: 1.25,  // dash meter refill
+  cdMult: 0.8,       // Combat Art and signature recharge
+  energyRegen: 1.25, // capacitor refill
+  enemySpd: 1.15,    // hostiles move ...
+  enemyShot: 1.3,    // ... and shoot faster ...
+  enemyFire: 0.8,    // ... more often ...
+  enemyHp: 1.0,      // ... with less hull each (the old build stacked ×1.5)
+  aggroMelee: 16,    // notice range (was 11)
+  aggroRanged: 22,   // (was 16)
+  leash: 44,         // give-up range (was 32)
+  packWake: 80,      // roaming packs wake this far out (was 65)
+  localCap: 26       // hostiles a nest field may hold at once (was 20)
 };
 
 </script>
@@ -2262,9 +2334,11 @@ GH.extraZones = [
   },
   {
     id: 'sky', hazard: 'lightning', name: 'AETHER COURT', sub: 'Territory', biome: 'a kingdom in the sky — islands, bridges, the court of the crown',
-    floor: { base: 0xe8e8f0, dark: '#5a5a70', mortar: '#a0a0b8' },
-    sky: ['#ffffff', '#8ac0ff', '#3060c0'],
-    fog: 0xd8e4ff, hemiSky: 0xffffff, hemiGround: 0x6080b0, sun: 0xfff8e0,
+    // cloud-marble ground a shade below white, so the court is not one
+    // white-out from the ground to the haze
+    floor: { base: 0xc4c8dc, dark: '#4a4a66', mortar: '#8a8ea8' },
+    sky: ['#f4f8ff', '#7ab0f8', '#2c58b8'],
+    fog: 0x9cb6e6, hemiSky: 0xe8eeff, hemiGround: 0x506898, sun: 0xfff0d0,
     wall: { base: '#f0f0f4', top: '#8090b0' },
     props: ['pillar'],
     roster: function (w) {
@@ -3223,6 +3297,31 @@ GH.models = (function () {
     var lampR = lampL.clone();
     lampR.position.x = 2.6;
     g.add(lampL, lampR);
+    if (kind === 'travel') {
+      // a territory portal is a landmark: twin obelisks, a wider arch, and
+      // a column of light climbing into the fog so it can be seen from far
+      // across the map — walk toward the light and you are walking to the
+      // next territory
+      var obL = box(1.4, 9, 1.4, stone); obL.position.set(-4.6, 4.5, 0.6);
+      var obR = box(1.4, 9, 1.4, stone); obR.position.set(4.6, 4.5, 0.6);
+      var capL = new THREE.Mesh(new THREE.ConeGeometry(1.0, 1.6, 4), mat(stone)); capL.position.set(-4.6, 9.8, 0.6); capL.rotation.y = Math.PI / 4;
+      var capR = capL.clone(); capR.position.x = 4.6;
+      g.add(obL, obR, capL, capR);
+      var beam = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 2.2, 46, 8, 1, true),
+        GH.assets.basic(glow, { transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false }));
+      beam.position.y = 23 + 2.8;
+      g.add(beam);
+      g.userData.beam = beam;
+      var halo = new THREE.Mesh(new THREE.RingGeometry(5.5, 6.4, 24),
+        GH.assets.basic(glow, { transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }));
+      halo.rotation.x = -Math.PI / 2; halo.position.y = 0.12;
+      g.add(halo);
+      // stepping stones through the arch, so the road reads as a threshold
+      for (var st = -2; st <= 2; st++) {
+        var slab = box(4.2, 0.18, 1.1, 0x4a5462); slab.position.set(0, 0.09, st * 1.4);
+        g.add(slab);
+      }
+    }
     blobShadow(g, 5);
     return g;
   };
@@ -4488,7 +4587,7 @@ GH.models = (function () {
     var g = new THREE.Group();
     var h = R(rnd, 1.5, 3.2);
     var pole = box(0.12, h, 0.12, 0xe0b050); pole.position.y = h / 2; g.add(pole);
-    var lamp = new THREE.Mesh(new THREE.OctahedronGeometry(0.35), mat(0xfff0a0, { emissive: 0xffd040 })); lamp.position.y = h + 0.3; g.add(lamp);
+    var lamp = new THREE.Mesh(new THREE.OctahedronGeometry(0.26), mat(0xf8e8b0, { emissive: 0xc09030, emissiveIntensity: 0.6 })); lamp.position.y = h + 0.25; g.add(lamp);
     return g;
   };
 
@@ -5077,7 +5176,7 @@ GH.terrain = (function () {
   };
   T.BIOMES.sky = {
     name: 'AETHER COURT', ground: 'snow', gravity: 14, built: true, voidBelow: -30,
-    water: { level: -16, color: 0xe8ecf6, opacity: 0.96, cloud: true },
+    water: { level: -16, color: 0xc8d2ea, opacity: 0.96, cloud: true },
     macro: function (size, rnd, lay) {
       var isl = [{ x: 0, z: 0, r: 58, h: 0 }];
       lay.gates.forEach(function (g) { isl.push({ x: g.x, z: g.z, r: 26, h: 0 }); });
@@ -5126,7 +5225,8 @@ GH.terrain = (function () {
     soft: function () { return 0; },
     color: function (h, s, x, z, o) {
       var n = fbm(x * 0.12, z * 0.12, 113);
-      o[0] = 0.78 + n * 0.1; o[1] = 0.8 + n * 0.1; o[2] = 0.86;
+      // cloud marble a shade below white: the court used to wash out into its own haze
+      o[0] = 0.6 + n * 0.1; o[1] = 0.63 + n * 0.1; o[2] = 0.75;
       var gold = sstep(0.6, 0.8, fbm(x * 0.05, z * 0.05, 114)); o[0] += gold * 0.12; o[1] += gold * 0.06; o[2] -= gold * 0.2;
       var edge = sstep(-2, -6, h); o[0] -= edge * 0.3; o[1] -= edge * 0.3; o[2] -= edge * 0.2;
     },
@@ -5489,7 +5589,7 @@ GH.terrain = (function () {
     sky: [
       { kind: 'cloudPillar', solid: 0.7, n: 220, cluster: 0.45, seed: 1101, band: [-8, 99] },
       { kind: 'aetherTree', solid: 0.4, n: 420, cluster: 0.5, seed: 1102, band: [-8, 99] },
-      { kind: 'skyLantern', n: 360, cluster: 0.4, seed: 1103, band: [-8, 99] }
+      { kind: 'skyLantern', n: 70, cluster: 0.75, seed: 1103, band: [-8, 99] } // was 360: a sky full of lamps hid the view
     ],
     null: [
       { kind: 'crystal', solid: 0.8, n: 720, cluster: 0.5, seed: 601, band: [-99, 99] },
@@ -5758,12 +5858,14 @@ GH.atmos = (function () {
   var cur = null; // {kind, obj, pos, vel, n, box}
 
   var KINDS = {
-    wreck: { kind: 'dust', n: 260, color: 0xe8d4a0, size: 0.22, opacity: 0.45, box: [70, 14, 70] },
-    glacier: { kind: 'snow', n: 900, color: 0xffffff, size: 0.34, opacity: 0.9, box: [70, 30, 70] },
-    cloister: { kind: 'rain', n: 700, color: 0xbfe8e0, opacity: 0.45, box: [60, 30, 60] },
-    ember: { kind: 'ember', n: 380, color: 0xff9040, size: 0.26, opacity: 0.9, box: [70, 26, 70] },
-    storm: { kind: 'rain', n: 900, color: 0xc8d0f0, opacity: 0.5, box: [70, 32, 70] },
-    null: { kind: 'motes', n: 420, color: 0xc090ff, size: 0.28, opacity: 0.75, box: [70, 24, 70] }
+    // counts were 260 / 900 / 700 / 380 / 900 / 420: dense enough to veil
+    // the view, and the bright rising embers read as a sky full of lanterns
+    wreck: { kind: 'dust', n: 180, color: 0xe8d4a0, size: 0.2, opacity: 0.35, box: [70, 14, 70] },
+    glacier: { kind: 'snow', n: 480, color: 0xffffff, size: 0.28, opacity: 0.7, box: [70, 30, 70] },
+    cloister: { kind: 'rain', n: 460, color: 0xbfe8e0, opacity: 0.38, box: [60, 30, 60] },
+    ember: { kind: 'ember', n: 140, color: 0xff8a3a, size: 0.18, opacity: 0.6, box: [70, 20, 70] },
+    storm: { kind: 'rain', n: 560, color: 0xc8d0f0, opacity: 0.42, box: [70, 32, 70] },
+    null: { kind: 'motes', n: 220, color: 0xc090ff, size: 0.24, opacity: 0.6, box: [70, 24, 70] }
   };
 
   function rnd(a, b) { return a + Math.random() * (b - a); }
@@ -6603,7 +6705,9 @@ GH.controls = (function () {
   var ARROW_ALIASES = { ArrowUp: 'forward', ArrowDown: 'back', ArrowLeft: 'turnLeft', ArrowRight: 'turnRight' };
 
   C.binds = {};
-  C.settings = { sens: 1.0, invertY: false, crt: true, crtLevel: 'subtle', mouseTurn: true, music: 1.0, sfx: 1.0 };
+  // look: the post-process default. 2 = the FILM grade (glow, vignette,
+  // colour grade, no scanlines) that replaced the CRT-by-default look.
+  C.settings = { sens: 1.0, invertY: false, crt: true, crtLevel: 'film', mouseTurn: true, music: 1.0, sfx: 1.0, look: 2 };
 
   var STORE_KEY = 'hf_controls_v1';
 
@@ -6615,6 +6719,11 @@ GH.controls = (function () {
         var d = JSON.parse(raw);
         if (d.binds) for (var k in d.binds) if (C.binds[k] !== undefined) C.binds[k] = d.binds[k];
         if (d.settings) for (var s in d.settings) if (C.settings[s] !== undefined) C.settings[s] = d.settings[s];
+        // profiles saved before the FILM look move onto it once; anyone who
+        // wants the tube back picks Subtle or Strong under CONTROLS
+        if (!d.settings || !d.settings.look || d.settings.look < 2) {
+          C.settings.crt = true; C.settings.crtLevel = 'film'; C.settings.look = 2;
+        }
       }
     } catch (e) { /* storage unavailable */ }
   };
@@ -6626,7 +6735,7 @@ GH.controls = (function () {
 
   C.reset = function () {
     C.ACTIONS.forEach(function (a) { C.binds[a.id] = a.def; });
-    C.settings = { sens: 1.0, invertY: false, crt: true, crtLevel: 'subtle', mouseTurn: true, music: 1.0, sfx: 1.0 };
+    C.settings = { sens: 1.0, invertY: false, crt: true, crtLevel: 'film', mouseTurn: true, music: 1.0, sfx: 1.0, look: 2 };
     C.save();
   };
 
@@ -10528,7 +10637,7 @@ GH.dungeons = (function () {
 <script>
 // STAALREUS — THE SHATTERED REACH
 // A zone-streamed world: each territory is its own HUGE map (500×500),
-// linked by travel gates, and every territory hides a gated DUNGEON —
+// linked by corner portals laid out on a world grid (see W.GRID), and every territory hides a gated DUNGEON —
 // a separate dark map holding its guardian packs, its sealed vault, and
 // the corrupt-frame lair at the far end. Only one zone is ever loaded;
 // zone builds are procedural and effectively instant, so travel is a
@@ -10539,19 +10648,52 @@ GH.world = (function () {
   W.OVERWORLD_SIZE = 500;   // one territory map
   W.DUNGEON_SIZE = 220;     // one dungeon map
 
-  // travel graph: which side of each territory carries the gate to whom
-  var GATE_SIDES = {
-    wreck: { glacier: 'W', cloister: 'E', hive: 'N' },
-    glacier: { wreck: 'E', ember: 'S' },
-    cloister: { wreck: 'W', storm: 'S', ruins: 'N' },
-    ember: { glacier: 'N', null: 'E', keep: 'S' },
-    storm: { cloister: 'N', null: 'W', warrens: 'S' },
-    null: { ember: 'W', storm: 'E', sky: 'N' },
-    hive: { wreck: 'S', ruins: 'E' },
-    ruins: { cloister: 'S', hive: 'W' },
-    keep: { ember: 'N', warrens: 'E' },
-    warrens: { keep: 'W', storm: 'N' },
-    sky: { null: 'S' }
+  // THE WORLD GRID — the Reach laid out like a real map. Every territory
+  // sits on a diamond lattice (col + row even) so its neighbours lie on
+  // the diagonals, and every travel portal stands in the CORNER of the
+  // map that points at its neighbour: leave the hub through the
+  // north-east portal and you arrive in the south-west corner of the
+  // Cloister, still walking north-east. Danger rises outward from the hub.
+  //
+  //            sky            ember           null
+  //                 glacier          cloister
+  //     warrens          [ wreck ]           storm
+  //                 hive             ruins
+  //                          keep
+  W.GRID = {
+    wreck: [0, 0],
+    glacier: [-1, -1], cloister: [1, -1], hive: [-1, 1], ruins: [1, 1],
+    ember: [0, -2], storm: [2, 0], keep: [0, 2], warrens: [-2, 0],
+    sky: [-2, -2], null: [2, -2]
+  };
+  // the four corners, as (sign x, sign z): z grows southward on the map
+  W.CORNERS = {
+    NW: { sx: -1, sz: -1, name: 'NORTH-WEST', arrow: '\u2196' },
+    NE: { sx: 1, sz: -1, name: 'NORTH-EAST', arrow: '\u2197' },
+    SW: { sx: -1, sz: 1, name: 'SOUTH-WEST', arrow: '\u2199' },
+    SE: { sx: 1, sz: 1, name: 'SOUTH-EAST', arrow: '\u2198' }
+  };
+  W.gridOf = function (zoneId) { return W.GRID[zoneId] || null; };
+  // which territory lies through each corner of this one (null = mountains)
+  W.neighbours = function (zoneId) {
+    var me = W.GRID[zoneId];
+    var out = {};
+    if (!me) return out;
+    for (var c in W.CORNERS) {
+      var cr = W.CORNERS[c];
+      var tx = me[0] + cr.sx, tz = me[1] + cr.sz;
+      out[c] = null;
+      for (var id in W.GRID) {
+        if (W.GRID[id][0] === tx && W.GRID[id][1] === tz) out[c] = id;
+      }
+    }
+    return out;
+  };
+  // the corner of `from` that leads to `to`, or null
+  W.cornerTo = function (from, to) {
+    var nb = W.neighbours(from);
+    for (var c in nb) if (nb[c] === to) return c;
+    return null;
   };
 
   W.ZONES = [
@@ -10641,12 +10783,13 @@ GH.world = (function () {
     };
   }
 
-  function gatePos(side, size) {
-    var m = size / 2 - 16;
-    if (side === 'N') return { x: 0, z: -m };
-    if (side === 'S') return { x: 0, z: m };
-    if (side === 'E') return { x: m, z: 0 };
-    return { x: -m, z: 0 };
+  // a corner portal stands a little further in than the old edge gates
+  // did: it is hemmed by the rim on two sides, and the road out of it
+  // needs room to turn toward the map's heart
+  function gatePos(corner, size) {
+    var m = size / 2 - 24;
+    var cr = W.CORNERS[corner] || W.CORNERS.NE;
+    return { x: cr.sx * m, z: cr.sz * m };
   }
 
   // ---------------------------------------------------------------
@@ -10660,10 +10803,11 @@ GH.world = (function () {
     var lay = { nests: [], gates: [], packs: [], relay: null, lair: null, vault: null, dungeonGate: null };
 
     if (!info.dungeon) {
-      var sides = GATE_SIDES[zoneId] || {};
-      for (var to in sides) {
-        var gp = gatePos(sides[to], size);
-        lay.gates.push({ to: to, x: gp.x, z: gp.z, side: sides[to] });
+      var nbs = W.neighbours(zoneId);
+      for (var corner in nbs) {
+        if (!nbs[corner]) continue;
+        var gp = gatePos(corner, size);
+        lay.gates.push({ to: nbs[corner], x: gp.x, z: gp.z, corner: corner, side: corner });
       }
       // FOUR dungeon gates per territory: the depths plus three more
       // archetypes from the zone's set. Each gate leads to the NEXT
@@ -11796,7 +11940,7 @@ GH.game = (function () {
   var G = {};
 
   // ---------- scene / world ----------
-  var scene, camera, hemi, sun, floor, wallRing, arenaProps;
+  var scene, camera, hemi, sun, rim, floor, wallRing, arenaProps;
   var ARENA_R = 33;
 
   // ---------- run state ----------
@@ -11936,11 +12080,16 @@ GH.game = (function () {
     GH.factions.notify = function (text, size) { if (G.state === 'play') queueAnnounce(text, size); };
     camera = new THREE.PerspectiveCamera(48, 16 / 9, 0.1, 220);
 
-    hemi = new THREE.HemisphereLight(0xbfe8ff, 0x24485a, 0.95);
+    // three-point light: a softer sky fill, a harder warm key, and a cool
+    // rim from behind so steel edges catch and frames stand off the ground
+    hemi = new THREE.HemisphereLight(0xbfe8ff, 0x24485a, 0.72);
     scene.add(hemi);
-    sun = new THREE.DirectionalLight(0xfff4d8, 0.9);
+    sun = new THREE.DirectionalLight(0xfff4d8, 1.15);
     sun.position.set(14, 13, 9); // low enough that slopes shade
     scene.add(sun);
+    rim = new THREE.DirectionalLight(0x7f96e0, 0.55);
+    rim.position.set(-12, 9, -15);
+    scene.add(rim);
 
     floor = new THREE.Mesh(
       new THREE.PlaneGeometry(120, 120),
@@ -12732,7 +12881,7 @@ GH.game = (function () {
         e.mesh.position.set(e.x, gy(e.x, e.z) + Math.sin(runTime * 30) * 0.03, e.z);
         continue;
       }
-      var spd = def.speed * (e.slowT > 0 ? 0.6 : 1) * (weekly ? weekly.mods.espd : 1) *
+      var spd = def.speed * GH.PACE.enemySpd * (e.slowT > 0 ? 0.6 : 1) * (weekly ? weekly.mods.espd : 1) *
         (e.speedMult || 1) *
         (expActive && weatherNow && weatherNow.id === 'whiteout' ? 0.85 : 1);
       if (inHazard('vines', e.x, e.z)) spd *= 0.65;
@@ -12763,13 +12912,13 @@ GH.game = (function () {
         else e.aggro = false;
       }
       if (expActive && !def.boss && !e.event) {
-        var aggroR = (def.behavior === 'ranged' ? 16 : 11) * (e.hostileHouse ? 2 : 1);
+        var aggroR = (def.behavior === 'ranged' ? GH.PACE.aggroRanged : GH.PACE.aggroMelee) * (e.hostileHouse ? 2 : 1);
         if (!e.aggro) {
           if (dist < aggroR || e.hp < e.maxHp) {
             e.aggro = true;
             e.popT = Math.max(e.popT, 0.15); // a startle pop when they notice you
           }
-        } else if (dist > 32) {
+        } else if (dist > GH.PACE.leash) {
           e.aggro = false;
         }
         if (!e.aggro) {
@@ -12887,7 +13036,7 @@ GH.game = (function () {
           e.hgt += (3.2 + Math.sin(e.anim) * 0.3 - e.hgt) * Math.min(1, dt * 3);
           e.shootCd -= dt;
           if (e.shootCd <= 0 && dist < 14) {
-            e.shootCd = def.shootInterval;
+            e.shootCd = def.shootInterval * GH.PACE.enemyFire;
             e.diveT = 0.7;
             GH.audio.dash();
           }
@@ -12998,7 +13147,7 @@ GH.game = (function () {
         }
         e.shootCd -= dt;
         if (e.shootCd <= 0 && dist < 16) {
-          e.shootCd = def.shootInterval;
+          e.shootCd = def.shootInterval * GH.PACE.enemyFire;
           spawnEnemyShot(e.x, 1, e.z, nx, nz, def.shotSpeed, e.damage);
         }
         // hover pose
@@ -13137,7 +13286,7 @@ GH.game = (function () {
       e.burstT -= dt;
       if (e.burstT <= 0) { e.burstT = 0.14; e.burstLeft--; volley(0.7); }
     } else if (e.shootCd <= 0 && dist < range) {
-      e.shootCd = def.shootInterval;
+      e.shootCd = def.shootInterval * GH.PACE.enemyFire;
       if (def.burst && def.burst > 1) { e.burstLeft = def.burst; e.burstT = 0; }
       else volley(0.9);
     }
@@ -13515,7 +13664,7 @@ GH.game = (function () {
       projectiles.push({
         mesh: m, x: originX, z: originZ,
         dirX: Math.sin(a), dirZ: Math.cos(a),
-        speed: w.speed * inst.mods.projSpd, life: w.life,
+        speed: w.speed * inst.mods.projSpd * GH.PACE.projSpd, life: w.life * GH.PACE.projLife,
         damage: dmg, inst: inst, elem: elem,
         pierce: w.pierce || 0, homing: w.homing || 0, aoe: w.aoe || 0,
         returning: w.type === 'boomerang', retAt: w.life * 0.45, returned: false,
@@ -13734,7 +13883,7 @@ GH.game = (function () {
       return;
     }
     player.energy -= ab.cost;
-    player.abilityCds[slot] = ab.cd * bon.cdMult * player.stats.artCd * GH.attrs.artRecharge(slot);
+    player.abilityCds[slot] = ab.cd * GH.PACE.cdMult * bon.cdMult * player.stats.artCd * GH.attrs.artRecharge(slot);
     tutorialEvent('ability', 1);
 
     if (slot === 1) {          // RUPTURE — focused strike
@@ -13800,7 +13949,7 @@ GH.game = (function () {
     if (needsTarget && (!target || target.dead)) { announce('NO TARGET — CLICK A HOSTILE', 16); return; }
     if (needsTarget && GH.dist2(player.x, player.z, target.x, target.z) > 18 * 18) { announce('OUT OF RANGE', 16); return; }
     player.energy -= sg.cost;
-    player.abilityCds[5] = sg.cd * player.skillBon.cdMult * player.stats.artCd * GH.attrs.artRecharge(5);
+    player.abilityCds[5] = sg.cd * GH.PACE.cdMult * player.skillBon.cdMult * player.stats.artCd * GH.attrs.artRecharge(5);
     announce(sg.name, 22);
     tutorialEvent('ability', 1);
     var i, e, a;
@@ -13895,7 +14044,7 @@ GH.game = (function () {
     // the capacitor always refills; cooldowns always tick
     // (a DAMPENED dungeon chokes the reactor)
     var enRate = dungeonState && dungeonState.modIds.dampened ? 0.55 : 1;
-    player.energy = Math.min(s.energyMax, player.energy + s.energyRegen * enRate * dt);
+    player.energy = Math.min(s.energyMax, player.energy + s.energyRegen * GH.PACE.energyRegen * enRate * dt);
     for (var c = 1; c <= 5; c++) {
       if (player.abilityCds[c] > 0) player.abilityCds[c] -= dt;
     }
@@ -13908,7 +14057,7 @@ GH.game = (function () {
       player.suppressed = false;
       if (!player.strafeInst) player.strafeInst = makeWeaponInst('strafe', STRAFE_DEF, false);
       var si = player.strafeInst;
-      si.timer -= dt * (s.atkSpdMult || 1);
+      si.timer -= dt * (s.atkSpdMult || 1) * GH.PACE.atkSpd;
       if (si.timer <= 0 && trigger) {
         si.timer = si.w.interval;
         var sAim = (target && !target.dead &&
@@ -13944,7 +14093,7 @@ GH.game = (function () {
 
     var inst = player.weapons[0];
     var w = inst.w;
-    var spdMult = s.atkSpdMult * frenzyMult() *
+    var spdMult = s.atkSpdMult * frenzyMult() * GH.PACE.atkSpd *
       (player.special.active > 0 && player.def.special === 'overdrive' ? 2 : 1) *
       inst.mods.atkSpdMult;
 
@@ -14453,7 +14602,7 @@ GH.game = (function () {
     m.scale.setScalar(elem === 'void' ? 0.3 : 0.22);
     m.position.set(x, y + gy(x, z), z);
     scene.add(m);
-    enemyShots.push({ mesh: m, x: x, y: y, z: z, dirX: dirX, dirZ: dirZ, speed: speed, damage: dmg, life: 4.5, elem: elem });
+    enemyShots.push({ mesh: m, x: x, y: y, z: z, dirX: dirX, dirZ: dirZ, speed: speed * GH.PACE.enemyShot, damage: dmg, life: 4.5 / GH.PACE.enemyShot, elem: elem });
   }
 
   // =================================================================
@@ -15527,7 +15676,7 @@ GH.game = (function () {
 
     player.blocking = player.def.special === 'block' && input.special && !player.speederOn;
 
-    var spd = s.speed * (player.blocking ? 0.55 : 1) * (player.sigKind === 'siege' ? 0.02 : 1);
+    var spd = s.speed * GH.PACE.moveSpd * (player.blocking ? 0.55 : 1) * (player.sigKind === 'siege' ? 0.02 : 1);
     if (player.protocols.vents && player.hp < s.maxHP * 0.35) spd *= 1.2;
     if (artOn('circuit_laurel')) spd *= 1.08;
     // a shouldered power core weighs on the servos
@@ -15567,8 +15716,8 @@ GH.game = (function () {
       player.z += player.velZ * dt;
     } else if (player.dashTime > 0) {
       player.dashTime -= dt;
-      player.x += player.dashX * 26 * dt;
-      player.z += player.dashZ * 26 * dt;
+      player.x += player.dashX * GH.PACE.dashSpd * dt;
+      player.z += player.dashZ * GH.PACE.dashSpd * dt;
       // ramming boost (AEGIS) / lunge slash (FANG)
       if (player.def.special === 'block' || player.dashKind === 'lunge') {
         for (var i = 0; i < enemies.length; i++) {
@@ -15651,7 +15800,7 @@ GH.game = (function () {
       player.z = GH.clamp(player.z, -ARENA_R, ARENA_R);
     }
 
-    player.boost = Math.min(1, player.boost + s.boostRegen * dt * (inRace && !player.speederOn ? 2 : 1));
+    player.boost = Math.min(1, player.boost + s.boostRegen * GH.PACE.boostRegen * dt * (inRace && !player.speederOn ? 2 : 1));
     if (input.boostPressed) { tryBoost(); input.boostPressed = false; }
     if (input.specialPressed) { trySpecial(); input.specialPressed = false; }
 
@@ -16020,14 +16169,14 @@ GH.game = (function () {
 
   function expeditionPlan(zone) {
     var st = GH.world.stageFor(zone.id);
-    // deliberate-combat tuning: fewer bodies, each one worth fighting.
+    // pace tuning lives in GH.PACE: more bodies that go down faster.
     // Dungeon tiers stack a garrison multiplier on top.
     var tm = zone.tier ? GH.dungeons.tierMult(zone.tier) : { hp: 1, dmg: 1 };
     return {
       duration: 999, rate: 0,
       types: st.roster(4 + zone.danger * 3),
       boss: null, midboss: null,
-      hpMult: (0.8 + (zone.danger - 1) * 0.9) * 1.5 * tm.hp * (tutorial ? 1 : GH.worldlife.band().ehp),
+      hpMult: (0.8 + (zone.danger - 1) * 0.9) * GH.PACE.enemyHp * tm.hp * (tutorial ? 1 : GH.worldlife.band().ehp),
       dmgMult: (0.9 + (zone.danger - 1) * 0.45) * tm.dmg * (tutorial ? 1 : GH.worldlife.band().edmg),
       overrun: false
     };
@@ -16118,11 +16267,21 @@ GH.game = (function () {
   var AMBIENT = { wreck: 'wind', glacier: 'wind', cloister: 'rain', ember: 'embers', storm: 'rain', null: 'hum',
     hive: 'city', ruins: 'wind', keep: 'wind', warrens: 'cave', sky: 'wind' };
 
-  function zoneFade() {
+  var zoneFadeTimer = null;
+  function zoneFade(dirText, nameText) {
     var f = document.getElementById('zone-fade');
     if (!f) return;
+    var t = document.getElementById('zone-fade-text');
+    if (t) {
+      if (nameText) {
+        t.innerHTML = '<div class="zf-dir">' + (dirText || '') + '</div><div class="zf-name">' + nameText + '</div>';
+        t.classList.remove('hidden');
+      } else t.classList.add('hidden');
+    }
     f.classList.add('on');
-    setTimeout(function () { f.classList.remove('on'); }, 280);
+    if (zoneFadeTimer) clearTimeout(zoneFadeTimer);
+    // a named crossing lingers like a GW2 zone card; a plain fade just blinks
+    zoneFadeTimer = setTimeout(function () { f.classList.remove('on'); zoneFadeTimer = null; }, nameText ? 950 : 280);
   }
 
   // look for the loaded zone: stage palette, or dungeon gloom
@@ -16229,20 +16388,30 @@ GH.game = (function () {
     GH.music.play(stage.id);
     wavePlan = expeditionPlan(zoneNow);
 
-    // arriving through a gate: appear beside its twin, facing inward
+    // arriving through a portal: appear beside its twin in the opposite
+    // corner, still walking the way you left — the camera swings to look
+    // into the new territory so travel reads as one continuous journey
+    var arrivedVia = null;
     if (fromZoneId && player) {
       var back = null;
       worldH.layout.gates.forEach(function (gt) { if (gt.to === fromZoneId) back = gt; });
       if (back) {
         var ina = Math.atan2(-back.x, -back.z);
-        player.x = back.x + Math.sin(ina) * 8;
-        player.z = back.z + Math.cos(ina) * 8;
+        player.x = back.x + Math.sin(ina) * 9;
+        player.z = back.z + Math.cos(ina) * 9;
+        if (!zoneNow.dungeon && back.corner) {
+          player.facing = ina;
+          camYaw = ina;
+          if (player.drive) player.drive.heading = ina;
+          arrivedVia = GH.world.cornerTo(fromZoneId, zoneId);
+        }
       } else {
         player.x = 0; player.z = 0;
       }
       travelCd = 2;
       if (mate) { mate.x = player.x + 2; mate.z = player.z + 1.5; }
     }
+    refreshZoneCompass();
 
     // the day's phenomena, where they belong
     if (harrowSpot && harrowSpot.zone === zoneId) {
@@ -16264,10 +16433,33 @@ GH.game = (function () {
 
     if (fromZoneId) {
       announce(zoneNow.name + ' — DANGER ' + ['I', 'II', 'III', 'IV'][zoneNow.danger - 1], 28);
-      zoneFade();
+      zoneFade(arrivedVia ? (GH.world.CORNERS[arrivedVia].arrow + ' ' + GH.world.CORNERS[arrivedVia].name) : (zoneNow.dungeon ? 'DESCENDING' : 'RETURNING'), zoneNow.name);
       saveExpedition();
     }
   }
+
+  // the HUD compass under the minimap: which territory lies through each
+  // corner portal of the loaded map, so travel always has a direction
+  function refreshZoneCompass() {
+    var el = document.getElementById('zone-compass');
+    if (!el) return;
+    if (!zoneNow || zoneNow.dungeon || !GH.world.gridOf(curZone)) { el.classList.add('hidden'); return; }
+    var nbs = GH.world.neighbours(curZone);
+    var html = '';
+    ['NW', 'NE', 'SW', 'SE'].forEach(function (c) {
+      var cr = GH.world.CORNERS[c];
+      var to = nbs[c];
+      var st = to ? GH.world.stageFor(to) : null;
+      var dz = to ? GH.world.zoneById(to).danger : 0;
+      html += '<div class="zc-row' + (to ? '' : ' zc-none') + '"><span class="zc-arrow">' + cr.arrow + '</span>' +
+        '<span class="zc-name">' + (st ? st.name : 'the mountains') + '</span>' +
+        (to ? '<span class="zc-danger">' + ['I', 'II', 'III', 'IV'][dz - 1] + '</span>' : '') + '</div>';
+    });
+    el.innerHTML = html;
+    el.classList.remove('hidden');
+  }
+  G.refreshZoneCompass = refreshZoneCompass;
+  G.currentZone = function () { return expActive ? curZone : null; };
 
   function travelZone(gate) {
     saveExpedition();
@@ -17519,7 +17711,7 @@ GH.game = (function () {
       for (var rp = 0; rp < worldH.layout.packs.length; rp++) {
         var pk = worldH.layout.packs[rp];
         if (!pk.roam || pk.spawned) continue;
-        if (GH.dist2(player.x, player.z, pk.x, pk.z) < 65 * 65) {
+        if (GH.dist2(player.x, player.z, pk.x, pk.z) < GH.PACE.packWake * GH.PACE.packWake) {
           pk.spawned = true;
           for (var pm = 0; pm < pk.n; pm++) {
             var ppick = GH.weightedPick(expeditionPlan(zoneNow).types);
@@ -17547,8 +17739,8 @@ GH.game = (function () {
       if (!ne.nestId || ne.dead) continue;
       ne.spawnT -= dt;
       var nd2 = GH.dist2(player.x, player.z, ne.x, ne.z);
-      if (ne.spawnT <= 0 && nd2 < 55 * 55 && localCount < 20) {
-        ne.spawnT = Math.max(1.8, 6 - ne.spawnZone.danger);
+      if (ne.spawnT <= 0 && nd2 < 60 * 60 && localCount < GH.PACE.localCap) {
+        ne.spawnT = Math.max(1.3, 4.6 - ne.spawnZone.danger * 0.8);
         var pick = GH.weightedPick(expeditionPlan(ne.spawnZone).types);
         var sa = Math.random() * Math.PI * 2;
         spawnEnemy(pick.id, ne.x + Math.cos(sa) * 4, ne.z + Math.sin(sa) * 4);
@@ -17602,7 +17794,11 @@ GH.game = (function () {
         }
       }
       if (gateNear && !siege) {
-        promptEl.textContent = '⇒ GATE: ' + GH.world.zoneInfo(gateNear.to).name;
+        var gInfo = GH.world.zoneInfo(gateNear.to);
+        var gCr = gateNear.corner ? GH.world.CORNERS[gateNear.corner] : null;
+        promptEl.textContent = gCr
+          ? gCr.arrow + ' ' + gCr.name + ' PORTAL: ' + gInfo.name + ' — DANGER ' + ['I', 'II', 'III', 'IV'][gInfo.danger - 1]
+          : (gateNear.exit ? '⇧ EXIT: ' : '⇒ GATE: ') + gInfo.name;
         promptEl.classList.remove('hidden');
       } else {
         promptEl.classList.add('hidden');
@@ -17763,13 +17959,22 @@ GH.game = (function () {
       ctx.arc(sx(GH.world.CIRCUIT.x), sz(GH.world.CIRCUIT.z), 5, 0, Math.PI * 2);
       ctx.stroke();
     }
-    // travel gates: bright doorways on the map edge
+    // portals: bright doorways in the corners, named for where they lead
     worldH.layout.gates.forEach(function (gt) {
       var dungeonGate = gt.to.indexOf('dungeon_') === 0;
       ctx.fillStyle = gt.exit ? '#ffd050' : dungeonGate ? '#c050ff' : '#60c8ff';
       ctx.fillRect(sx(gt.x) - 2.5, sz(gt.z) - 2.5, 5, 5);
       ctx.strokeStyle = ctx.fillStyle;
       ctx.strokeRect(sx(gt.x) - 4.5, sz(gt.z) - 4.5, 9, 9);
+      if (gt.corner) {
+        var cr = GH.world.CORNERS[gt.corner];
+        var nm = GH.world.stageFor(gt.to).name.split(' ')[0];
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = cr.sx < 0 ? 'left' : 'right';
+        ctx.fillStyle = '#bfe8ff';
+        ctx.fillText(nm, sx(gt.x) + (cr.sx < 0 ? 7 : -7), sz(gt.z) + (cr.sz < 0 ? 12 : -10));
+        ctx.textAlign = 'left';
+      }
     });
     worldH.layout.nests.forEach(function (n) {
       ctx.fillStyle = w.nests[n.id] ? '#4a5a4a' : '#ff5040';
@@ -19171,6 +19376,8 @@ GH.game = (function () {
     if (il) il.classList.add('hidden');
     var mm = document.getElementById('minimap');
     if (mm) mm.classList.add('hidden');
+    var zc = document.getElementById('zone-compass');
+    if (zc) zc.classList.add('hidden');
   }
 
   G.startRun = function (mechIndex, stageIdx, startAt, opts) {
@@ -19791,6 +19998,7 @@ GH.game = (function () {
       var g0 = worldH.layout.gates[0];
       var ina = Math.atan2(-g0.x, -g0.z);
       player.x = g0.x + Math.sin(ina) * 10; player.z = g0.z + Math.cos(ina) * 10;
+      player.facing = ina; camYaw = ina;
     }
     var sp0 = openSpot(player.x, player.z, 0.8);
     if (sp0) { player.x = sp0.x; player.z = sp0.z; }
@@ -19798,6 +20006,19 @@ GH.game = (function () {
     return true;
   };
   G.devEventNow = function () { zoneEventT = 0.01; return !!ZONE_EVENTS[curZone]; };
+  // dev/test: put the pilot at (x, z) facing `facing` radians; where am I
+  G.devPlace = function (x, z, facing) {
+    if (!player) return false;
+    player.x = x; player.z = z;
+    if (facing !== undefined) { player.facing = facing; camYaw = facing; }
+    camGround = gy(player.x, player.z);
+    return true;
+  };
+  G.devInfo = function () {
+    if (!player) return null;
+    return { zone: curZone, x: Math.round(player.x), z: Math.round(player.z), facing: player.facing,
+      gates: worldH ? worldH.layout.gates.filter(function (g) { return !g.arch; }).map(function (g) { return { to: g.to, x: Math.round(g.x), z: Math.round(g.z), corner: g.corner || g.side }; }) : [] };
+  };
   // dev/test: spawn any enemy beside the pilot; kill the live boss; today's hunt spot
   G.devSpawn = function (id, dx, dz) { if (!player || !GH.enemyDefs[id]) return null; var e = spawnEnemy(id, player.x + (dx || 8), player.z + (dz || 0)); if (e) e.aggro = true; return !!e; };
   G.devKillBoss = function () { if (bossRef && !bossRef.dead) { bossRef.shieldUp = false; damageEnemy(bossRef, 1e9, { canCrit: false }); if (bossRef && bossRef.hp <= 0) killEnemy(bossRef); return true; } return false; };
@@ -19858,10 +20079,13 @@ GH.crt = (function () {
 
   var LEVELS = {
     // maskType 0: two-phase magenta/green grille (soft), 1: full RGB aperture grille
+    // film: no tube at all — a soft halation glow, a colour grade (lifted
+    // contrast, richer saturation, warm lights / cool shadows) and a vignette
+    film: { curve: 0, scan: 0, mask: 0, maskType: 0, glow: 0.16, aberr: 0, vig: 0.26, grade: 1 },
     subtle: { curve: 0.025, scan: 0.40, mask: 0.12, maskType: 0, glow: 0.05, aberr: 0.10, vig: 0.08 },
     strong: { curve: 0.06, scan: 0.80, mask: 0.35, maskType: 1, glow: 0.20, aberr: 0.60, vig: 0.16 }
   };
-  var level = 'subtle';
+  var level = 'film';
 
   var uniforms = {
     tDiffuse: { value: null },
@@ -19869,7 +20093,7 @@ GH.crt = (function () {
     uOut: { value: new THREE.Vector2(960, 540) },   // canvas size
     uCurve: { value: 0 }, uScan: { value: 0 }, uMask: { value: 0 },
     uGlow: { value: 0 }, uAberr: { value: 0 }, uVig: { value: 0 },
-    uMaskType: { value: 0 }, uGain: { value: 1 }
+    uMaskType: { value: 0 }, uGain: { value: 1 }, uGrade: { value: 0 }
   };
 
   var VERT = [
@@ -19881,7 +20105,7 @@ GH.crt = (function () {
     'uniform sampler2D tDiffuse;',
     'uniform vec2 uSrc;',
     'uniform vec2 uOut;',
-    'uniform float uCurve, uScan, uMask, uGlow, uAberr, uVig, uMaskType, uGain;',
+    'uniform float uCurve, uScan, uMask, uGlow, uAberr, uVig, uMaskType, uGain, uGrade;',
     'varying vec2 vUv;',
     '',
     // barrel distortion: the picture bows outward the way glass tubes do
@@ -19952,6 +20176,18 @@ GH.crt = (function () {
     '  }',
     '  col *= mask;',
     '',
+    // the film grade: a touch more contrast and saturation, highlights
+    // pushed warm and shadows cool, a soft roll-off so bright steel and
+    // muzzle flashes bloom instead of clipping
+    '  if (uGrade > 0.0) {',
+    '    float l = luma(col);',
+    '    col = mix(vec3(l), col, 1.0 + 0.22 * uGrade);',
+    '    col = (col - 0.5) * (1.0 + 0.14 * uGrade) + 0.5;',
+    '    col += (l - 0.45) * vec3(0.05, 0.01, -0.06) * uGrade;',
+    '    col = max(col, 0.0);',
+    '    col = col / (1.0 + col * 0.12 * uGrade) * (1.0 + 0.12 * uGrade);',
+    '  }',
+    '',
     // give back what the gaps and mask took, then darken the corners
     '  col *= uGain;',
     '  float v = 16.0 * uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y);',
@@ -19984,6 +20220,7 @@ GH.crt = (function () {
     uniforms.uCurve.value = L.curve; uniforms.uScan.value = L.scan; uniforms.uMask.value = L.mask;
     uniforms.uGlow.value = L.glow; uniforms.uAberr.value = L.aberr; uniforms.uVig.value = L.vig;
     uniforms.uMaskType.value = L.maskType;
+    uniforms.uGrade.value = L.grade || 0;
     // gain roughly restores mid-tone brightness lost to the gaps and the mask,
     // held a little under 1:1 so highlights keep their contrast
     var scanAvg = 1.0 - 0.32 * L.scan;
@@ -19995,7 +20232,7 @@ GH.crt = (function () {
   M.setEnabled = function (on) { enabled = !!on && !failed; return enabled; };
   M.active = function () { return enabled; };
   M.failed = function () { return failed; };
-  M.setLevel = function (name) { level = LEVELS[name] ? name : 'subtle'; if (mat) applyLevel(); };
+  M.setLevel = function (name) { level = LEVELS[name] ? name : 'film'; if (mat) applyLevel(); };
   M.levels = function () { return Object.keys(LEVELS); };
 
   // rw/rh: the low-res scene size, w/h: the canvas size
@@ -20041,7 +20278,7 @@ GH.crt = (function () {
 // STAALREUS — boot, renderer, input, screen wiring
 (function () {
   var renderer, canvas;
-  var PIXEL_SCALE = 3;   // render at 1/3 resolution for the retro look
+  var PIXEL_SCALE = 2;   // render at half resolution: chunky, but the frames keep their edges (was 1/3)
   var input = {
     keys: {},
     mouseNDC: new THREE.Vector2(0, 0),
@@ -20115,9 +20352,11 @@ GH.crt = (function () {
   // settings that live outside the pilot profile (CRT filter, camera)
   function applySettings() {
     var st = GH.controls.settings;
-    GH.crt.setLevel(st.crtLevel || 'subtle');
+    GH.crt.setLevel(st.crtLevel || 'film');
     var shader = GH.crt.setEnabled(!!st.crt);
-    document.getElementById('crt-overlay').classList.toggle('off', !st.crt || shader);
+    // the CSS scanline overlay only stands in for a failed TUBE shader; the
+    // film grade has no fallback worth drawing
+    document.getElementById('crt-overlay').classList.toggle('off', !st.crt || shader || (st.crtLevel || 'film') === 'film');
     resize();
     GH.music.setVolume(0.12 * (st.music === undefined ? 1 : st.music));
     GH.audio.setVolume(0.25 * (st.sfx === undefined ? 1 : st.sfx));
@@ -21619,6 +21858,7 @@ GH.crt = (function () {
       ' · DUNGEONS ASCENDED <b>' + cleared + '/' + (GH.world.ZONES.length * 4) + '</b>' +
       ' · TOTAL TIERS CLIMBED <b>' + totalTiers + '</b>' +
       (harrow ? ' · <span class="mp-harrow">THE HARROW: ' + GH.world.stageFor(harrow.zone).name + '</span>' : '');
+    renderMapGrid();
     var wrap = document.getElementById('map-zones');
     wrap.innerHTML = '';
     GH.world.ZONES.forEach(function (zn) {
@@ -21664,6 +21904,47 @@ GH.crt = (function () {
       card.innerHTML = head + rows;
       wrap.appendChild(card);
     });
+  }
+
+  // the Reach as a map: territories on their grid, corner touching corner,
+  // the loaded one lit and its four neighbours marked (see GH.world.GRID)
+  function renderMapGrid() {
+    var host = document.getElementById('map-grid');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'map-grid';
+      var zonesEl = document.getElementById('map-zones');
+      zonesEl.parentNode.insertBefore(host, zonesEl);
+    }
+    host.innerHTML = '';
+    var cur = GH.game.currentZone ? GH.game.currentZone() : null;
+    var curParent = cur ? GH.world.zoneInfo(cur).parent : null;
+    var nbs = curParent ? GH.world.neighbours(curParent) : {};
+    var nextSet = {};
+    for (var c in nbs) if (nbs[c]) nextSet[nbs[c]] = GH.world.CORNERS[c];
+    var hd = GH.meta.data.huntsToday || { day: null, slain: {} };
+    var todaySlain = hd.day === GH.world.dayStamp() ? hd.slain : {};
+    for (var row = -2; row <= 2; row++) {
+      for (var col = -2; col <= 2; col++) {
+        var id = null;
+        for (var z in GH.world.GRID) if (GH.world.GRID[z][0] === col && GH.world.GRID[z][1] === row) id = z;
+        var tile = document.createElement('div');
+        if (!id) { tile.className = 'mg-empty'; host.appendChild(tile); continue; }
+        var st = GH.world.stageFor(id);
+        var zn = GH.world.zoneById(id);
+        tile.className = 'mg-tile' + (id === 'wreck' ? ' hub' : '') + (id === curParent ? ' here' : '') + (nextSet[id] ? ' next' : '');
+        var hunt = GH.bosses.todayFor(id, GH.world.dayStamp(), todaySlain);
+        tile.innerHTML = '<div>' + (nextSet[id] ? '<span style="color:#60c8ff">' + nextSet[id].arrow + '</span> ' : '') + st.name + '</div>' +
+          '<div class="mg-danger">DANGER ' + ['I', 'II', 'III', 'IV'][zn.danger - 1] + '</div>' +
+          (hunt ? '<span class="mg-hunt" title="' + hunt.name + '">☠</span>' : '');
+        tile.title = st.biome || st.name;
+        host.appendChild(tile);
+      }
+    }
+    var note = document.createElement('div');
+    note.className = 'mg-note';
+    note.textContent = 'Portals stand in the four corners of every territory. Leave through a corner and you arrive in the opposite corner of the next map, still travelling the same way.';
+    host.appendChild(note);
   }
 
   // ----------------------------------------------------------------
@@ -22172,7 +22453,7 @@ GH.crt = (function () {
     document.getElementById('set-sens-val').textContent = Math.round(st.sens * 100) + '%';
     document.getElementById('set-invert').checked = !!st.invertY;
     document.getElementById('set-crt').checked = !!st.crt;
-    document.getElementById('set-crt-level').value = st.crtLevel || 'subtle';
+    document.getElementById('set-crt-level').value = st.crtLevel || 'film';
     document.getElementById('set-cam').value = GH.game.camMode();
     document.getElementById('set-mute').checked = GH.audio.isMuted();
     document.getElementById('set-music').value = Math.round((st.music === undefined ? 1 : st.music) * 100);

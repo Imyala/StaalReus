@@ -222,9 +222,11 @@ GH.extraZones = [
   },
   {
     id: 'sky', hazard: 'lightning', name: 'AETHER COURT', sub: 'Territory', biome: 'a kingdom in the sky — islands, bridges, the court of the crown',
-    floor: { base: 0xe8e8f0, dark: '#5a5a70', mortar: '#a0a0b8' },
-    sky: ['#ffffff', '#8ac0ff', '#3060c0'],
-    fog: 0xd8e4ff, hemiSky: 0xffffff, hemiGround: 0x6080b0, sun: 0xfff8e0,
+    // cloud-marble ground a shade below white, so the court is not one
+    // white-out from the ground to the haze
+    floor: { base: 0xc4c8dc, dark: '#4a4a66', mortar: '#8a8ea8' },
+    sky: ['#f4f8ff', '#7ab0f8', '#2c58b8'],
+    fog: 0x9cb6e6, hemiSky: 0xe8eeff, hemiGround: 0x506898, sun: 0xfff0d0,
     wall: { base: '#f0f0f4', top: '#8090b0' },
     props: ['pillar'],
     roster: function (w) {

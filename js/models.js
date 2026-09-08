@@ -903,6 +903,31 @@ GH.models = (function () {
     var lampR = lampL.clone();
     lampR.position.x = 2.6;
     g.add(lampL, lampR);
+    if (kind === 'travel') {
+      // a territory portal is a landmark: twin obelisks, a wider arch, and
+      // a column of light climbing into the fog so it can be seen from far
+      // across the map — walk toward the light and you are walking to the
+      // next territory
+      var obL = box(1.4, 9, 1.4, stone); obL.position.set(-4.6, 4.5, 0.6);
+      var obR = box(1.4, 9, 1.4, stone); obR.position.set(4.6, 4.5, 0.6);
+      var capL = new THREE.Mesh(new THREE.ConeGeometry(1.0, 1.6, 4), mat(stone)); capL.position.set(-4.6, 9.8, 0.6); capL.rotation.y = Math.PI / 4;
+      var capR = capL.clone(); capR.position.x = 4.6;
+      g.add(obL, obR, capL, capR);
+      var beam = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 2.2, 46, 8, 1, true),
+        GH.assets.basic(glow, { transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false }));
+      beam.position.y = 23 + 2.8;
+      g.add(beam);
+      g.userData.beam = beam;
+      var halo = new THREE.Mesh(new THREE.RingGeometry(5.5, 6.4, 24),
+        GH.assets.basic(glow, { transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }));
+      halo.rotation.x = -Math.PI / 2; halo.position.y = 0.12;
+      g.add(halo);
+      // stepping stones through the arch, so the road reads as a threshold
+      for (var st = -2; st <= 2; st++) {
+        var slab = box(4.2, 0.18, 1.1, 0x4a5462); slab.position.set(0, 0.09, st * 1.4);
+        g.add(slab);
+      }
+    }
     blobShadow(g, 5);
     return g;
   };
@@ -2168,7 +2193,7 @@ GH.models = (function () {
     var g = new THREE.Group();
     var h = R(rnd, 1.5, 3.2);
     var pole = box(0.12, h, 0.12, 0xe0b050); pole.position.y = h / 2; g.add(pole);
-    var lamp = new THREE.Mesh(new THREE.OctahedronGeometry(0.35), mat(0xfff0a0, { emissive: 0xffd040 })); lamp.position.y = h + 0.3; g.add(lamp);
+    var lamp = new THREE.Mesh(new THREE.OctahedronGeometry(0.26), mat(0xf8e8b0, { emissive: 0xc09030, emissiveIntensity: 0.6 })); lamp.position.y = h + 0.25; g.add(lamp);
     return g;
   };
 

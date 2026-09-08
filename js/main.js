@@ -1,7 +1,7 @@
 // STAALREUS — boot, renderer, input, screen wiring
 (function () {
   var renderer, canvas;
-  var PIXEL_SCALE = 3;   // render at 1/3 resolution for the retro look
+  var PIXEL_SCALE = 2;   // render at half resolution: chunky, but the frames keep their edges (was 1/3)
   var input = {
     keys: {},
     mouseNDC: new THREE.Vector2(0, 0),
@@ -75,9 +75,11 @@
   // settings that live outside the pilot profile (CRT filter, camera)
   function applySettings() {
     var st = GH.controls.settings;
-    GH.crt.setLevel(st.crtLevel || 'subtle');
+    GH.crt.setLevel(st.crtLevel || 'film');
     var shader = GH.crt.setEnabled(!!st.crt);
-    document.getElementById('crt-overlay').classList.toggle('off', !st.crt || shader);
+    // the CSS scanline overlay only stands in for a failed TUBE shader; the
+    // film grade has no fallback worth drawing
+    document.getElementById('crt-overlay').classList.toggle('off', !st.crt || shader || (st.crtLevel || 'film') === 'film');
     resize();
     GH.music.setVolume(0.12 * (st.music === undefined ? 1 : st.music));
     GH.audio.setVolume(0.25 * (st.sfx === undefined ? 1 : st.sfx));
@@ -1579,6 +1581,7 @@
       ' · DUNGEONS ASCENDED <b>' + cleared + '/' + (GH.world.ZONES.length * 4) + '</b>' +
       ' · TOTAL TIERS CLIMBED <b>' + totalTiers + '</b>' +
       (harrow ? ' · <span class="mp-harrow">THE HARROW: ' + GH.world.stageFor(harrow.zone).name + '</span>' : '');
+    renderMapGrid();
     var wrap = document.getElementById('map-zones');
     wrap.innerHTML = '';
     GH.world.ZONES.forEach(function (zn) {
@@ -1624,6 +1627,47 @@
       card.innerHTML = head + rows;
       wrap.appendChild(card);
     });
+  }
+
+  // the Reach as a map: territories on their grid, corner touching corner,
+  // the loaded one lit and its four neighbours marked (see GH.world.GRID)
+  function renderMapGrid() {
+    var host = document.getElementById('map-grid');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'map-grid';
+      var zonesEl = document.getElementById('map-zones');
+      zonesEl.parentNode.insertBefore(host, zonesEl);
+    }
+    host.innerHTML = '';
+    var cur = GH.game.currentZone ? GH.game.currentZone() : null;
+    var curParent = cur ? GH.world.zoneInfo(cur).parent : null;
+    var nbs = curParent ? GH.world.neighbours(curParent) : {};
+    var nextSet = {};
+    for (var c in nbs) if (nbs[c]) nextSet[nbs[c]] = GH.world.CORNERS[c];
+    var hd = GH.meta.data.huntsToday || { day: null, slain: {} };
+    var todaySlain = hd.day === GH.world.dayStamp() ? hd.slain : {};
+    for (var row = -2; row <= 2; row++) {
+      for (var col = -2; col <= 2; col++) {
+        var id = null;
+        for (var z in GH.world.GRID) if (GH.world.GRID[z][0] === col && GH.world.GRID[z][1] === row) id = z;
+        var tile = document.createElement('div');
+        if (!id) { tile.className = 'mg-empty'; host.appendChild(tile); continue; }
+        var st = GH.world.stageFor(id);
+        var zn = GH.world.zoneById(id);
+        tile.className = 'mg-tile' + (id === 'wreck' ? ' hub' : '') + (id === curParent ? ' here' : '') + (nextSet[id] ? ' next' : '');
+        var hunt = GH.bosses.todayFor(id, GH.world.dayStamp(), todaySlain);
+        tile.innerHTML = '<div>' + (nextSet[id] ? '<span style="color:#60c8ff">' + nextSet[id].arrow + '</span> ' : '') + st.name + '</div>' +
+          '<div class="mg-danger">DANGER ' + ['I', 'II', 'III', 'IV'][zn.danger - 1] + '</div>' +
+          (hunt ? '<span class="mg-hunt" title="' + hunt.name + '">☠</span>' : '');
+        tile.title = st.biome || st.name;
+        host.appendChild(tile);
+      }
+    }
+    var note = document.createElement('div');
+    note.className = 'mg-note';
+    note.textContent = 'Portals stand in the four corners of every territory. Leave through a corner and you arrive in the opposite corner of the next map, still travelling the same way.';
+    host.appendChild(note);
   }
 
   // ----------------------------------------------------------------
@@ -2132,7 +2176,7 @@
     document.getElementById('set-sens-val').textContent = Math.round(st.sens * 100) + '%';
     document.getElementById('set-invert').checked = !!st.invertY;
     document.getElementById('set-crt').checked = !!st.crt;
-    document.getElementById('set-crt-level').value = st.crtLevel || 'subtle';
+    document.getElementById('set-crt-level').value = st.crtLevel || 'film';
     document.getElementById('set-cam').value = GH.game.camMode();
     document.getElementById('set-mute').checked = GH.audio.isMuted();
     document.getElementById('set-music').value = Math.round((st.music === undefined ? 1 : st.music) * 100);

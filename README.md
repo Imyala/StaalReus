@@ -40,7 +40,17 @@ MMO-style: **W/S** walk, **A/D** turn, **Q/E** strafe, **hold RIGHT MOUSE** to l
 **LEFT CLICK** attacks and marks a target, **TAB** cycles targets, **1–4** abilities, **Z/X/C** wards,
 **SPACE** boost / drift, **SHIFT** special / nitro, **T** transform (W throttle, S brake, A/D steer),
 **F** interact, **V** tactical camera, **K** training, **M** map, **P** pilot sheet, **J** quest journal, **ESC** pause / close any menu.
-**H** toggles the CRT shader (scanlines, phosphor mask, glow, curve); pick Subtle or Strong under CONTROLS.
+**H** toggles the screen shader; CONTROLS → Screen look picks FILM (glow, vignette, colour grade — the default) or a subtle / strong CRT tube.
+
+## Travelling the Reach
+
+The eleven territories sit on one world grid, the way Guild Wars 2 lays out its zones. Every territory
+has up to four **portals, one in each corner**, and each corner points at the neighbour that lies in
+that direction: leave the hub through the north-east portal and you arrive in the south-west corner of
+the Verdant Cloister, still walking north-east. A zone compass under the minimap names what lies
+through each corner, the minimap labels every portal, and the WORLD MAP (M) draws the whole grid.
+Danger rises outward from the hub; no territory is more than two crossings away.
+Details: `docs/design/14-world-grid-pace-look.md` (also the combat pace dial `GH.PACE` in `js/util.js`).
 
 ## The 135 frames
 
@@ -124,11 +134,11 @@ Note: older design docs call the game HERO FRAME or Gundam Circuit; the name is 
 
 ## Project Structure
 
-- `/js` — game logic and systems (`controls.js` key bindings, `roster.js` the 135-frame roster and workshop, `attrs.js` attributes and Combat Art runes)
+- `/js` — game logic and systems (`world.js` the world grid and zone layouts, `util.js` the `GH.PACE` combat-pace dial, `controls.js` key bindings, `roster.js` the 135-frame roster and workshop, `attrs.js` attributes and Combat Art runes)
 - `/css` — UI and presentation styles
 - `/lib` — third-party runtime libraries
 - `/dist` — bundled output
-- `/docs/design` — design bible (10 documents)
+- `/docs/design` — design bible (15 documents)
 - `/docs/research` — raw research reports
 
 ## Roadmap Ideas

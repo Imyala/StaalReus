@@ -8,12 +8,14 @@ GH.atmos = (function () {
   var cur = null; // {kind, obj, pos, vel, n, box}
 
   var KINDS = {
-    wreck: { kind: 'dust', n: 260, color: 0xe8d4a0, size: 0.22, opacity: 0.45, box: [70, 14, 70] },
-    glacier: { kind: 'snow', n: 900, color: 0xffffff, size: 0.34, opacity: 0.9, box: [70, 30, 70] },
-    cloister: { kind: 'rain', n: 700, color: 0xbfe8e0, opacity: 0.45, box: [60, 30, 60] },
-    ember: { kind: 'ember', n: 380, color: 0xff9040, size: 0.26, opacity: 0.9, box: [70, 26, 70] },
-    storm: { kind: 'rain', n: 900, color: 0xc8d0f0, opacity: 0.5, box: [70, 32, 70] },
-    null: { kind: 'motes', n: 420, color: 0xc090ff, size: 0.28, opacity: 0.75, box: [70, 24, 70] }
+    // counts were 260 / 900 / 700 / 380 / 900 / 420: dense enough to veil
+    // the view, and the bright rising embers read as a sky full of lanterns
+    wreck: { kind: 'dust', n: 180, color: 0xe8d4a0, size: 0.2, opacity: 0.35, box: [70, 14, 70] },
+    glacier: { kind: 'snow', n: 480, color: 0xffffff, size: 0.28, opacity: 0.7, box: [70, 30, 70] },
+    cloister: { kind: 'rain', n: 460, color: 0xbfe8e0, opacity: 0.38, box: [60, 30, 60] },
+    ember: { kind: 'ember', n: 140, color: 0xff8a3a, size: 0.18, opacity: 0.6, box: [70, 20, 70] },
+    storm: { kind: 'rain', n: 560, color: 0xc8d0f0, opacity: 0.42, box: [70, 32, 70] },
+    null: { kind: 'motes', n: 220, color: 0xc090ff, size: 0.24, opacity: 0.6, box: [70, 24, 70] }
   };
 
   function rnd(a, b) { return a + Math.random() * (b - a); }

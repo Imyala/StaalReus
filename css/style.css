@@ -816,6 +816,30 @@ body.looking #crosshair { opacity: 0.4; }
   z-index: 40;
 }
 #zone-fade.on { opacity: 1; transition: opacity 0.05s; }
+#zone-fade-text {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  text-align: center; font-family: var(--font-head); font-weight: bold;
+  color: var(--parchment); text-shadow: 0 0 18px rgba(226, 178, 92, 0.35), 2px 2px 0 #000;
+}
+.zf-dir { font-size: 15px; letter-spacing: 4px; color: var(--brass); margin-bottom: 8px; }
+.zf-name { font-size: 40px; letter-spacing: 6px; }
+.zf-name::after { content: ''; display: block; width: 60%; height: 1px; margin: 12px auto 0; background: linear-gradient(90deg, transparent, var(--bronze), transparent); }
+
+/* the zone compass: what lies through each corner portal */
+#zone-compass {
+  position: absolute; right: 14px; bottom: 182px;
+  width: 160px; padding: 4px 6px;
+  background: rgba(8, 6, 4, 0.78);
+  border: 1px solid var(--bronze2); box-shadow: 0 0 0 1px #000;
+  font-family: var(--font-body); font-size: 10px; line-height: 14px;
+  color: var(--parch2); pointer-events: none;
+}
+.zc-row { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; overflow: hidden; }
+.zc-arrow { color: #60c8ff; font-weight: bold; width: 12px; }
+.zc-name { flex: 1; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.5px; }
+.zc-danger { color: #c86060; font-size: 9px; }
+.zc-none { opacity: 0.4; }
+.zc-none .zc-arrow { color: var(--dim); }
 
 /* ---------------- target combat + abilities ---------------- */
 
@@ -859,8 +883,29 @@ body.looking #crosshair { opacity: 0.4; }
 #map-zones {
   display: grid; grid-template-columns: repeat(3, 300px);
   gap: 10px; justify-content: center;
-  max-height: 62vh; overflow-y: auto; padding: 4px;
+  max-height: 40vh; overflow-y: auto; padding: 4px;
 }
+/* the Reach drawn as a map: five columns, corners touching corners */
+#map-grid {
+  display: grid; grid-template-columns: repeat(5, 128px); grid-auto-rows: 40px;
+  gap: 4px; justify-content: center; margin-bottom: 10px;
+  background: var(--hatch), rgba(10, 8, 6, 0.6); padding: 8px; border: 1px solid var(--seam);
+}
+.mg-tile {
+  position: relative; display: flex; flex-direction: column; justify-content: center;
+  padding: 0 6px; border: 1px solid var(--bronze2);
+  background: linear-gradient(rgba(38, 32, 24, 0.95), rgba(18, 15, 11, 0.98));
+  font-family: var(--font-head); font-size: 10px; letter-spacing: 0.5px; color: var(--parchment);
+  text-shadow: 1px 1px 0 #000; overflow: hidden; cursor: default;
+}
+.mg-tile .mg-danger { font-family: var(--font-body); font-size: 9px; color: #c86060; }
+.mg-tile.here { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold), 0 0 12px rgba(242, 207, 122, 0.35); }
+.mg-tile.here::after { content: 'YOU ARE HERE'; position: absolute; right: 4px; top: 2px; font-size: 7px; color: var(--gold); letter-spacing: 1px; }
+.mg-tile.next { border-color: #60c8ff; }
+.mg-tile .mg-hunt { position: absolute; right: 4px; bottom: 2px; font-size: 9px; color: #ffb060; }
+.mg-tile.hub { background: linear-gradient(rgba(60, 48, 28, 0.95), rgba(28, 22, 12, 0.98)); }
+.mg-empty { border: 1px dashed rgba(90, 74, 48, 0.25); }
+.mg-note { grid-column: 1 / -1; font-family: var(--font-body); font-size: 10px; color: var(--dim); text-align: center; line-height: 14px; }
 .mp-zone { background: linear-gradient(rgba(38, 32, 24, 0.92), rgba(18, 15, 11, 0.95)); border: 1px solid var(--seam); padding: 8px 10px; text-align: left; }
 .mp-name { font-family: var(--font-head); font-weight: bold; font-size: 15px; color: var(--parchment); text-shadow: 1px 1px 0 #000; }
 .mp-danger { color: #c86060; font-size: 11px; }

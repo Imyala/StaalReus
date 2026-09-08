@@ -73,6 +73,11 @@ Doc 09 maps each of these onto the current files.
 | 07 | Enemies, bosses and missions: roster, 17 boss puzzles, 4-act mission list, world and dungeons |
 | 08 | HUD, controls, camera, onboarding |
 | 09 | Codebase gap analysis and build roadmap |
+| 10 | The world as built: terrain, biomes, fauna, tracks |
+| 11 | Next steps and factions |
+| 12 | Release readiness |
+| 13 | World life, drifting, vehicles, silhouettes, the balance pass |
+| 14 | The world grid and corner portals, the combat pace dial, weather density, the film look |
 | research/ | The six raw research reports these docs are distilled from |
 
 ## 6. Research caveat

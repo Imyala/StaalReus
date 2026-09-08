@@ -37,3 +37,29 @@ GH.weightedPick = function (arr) {
   }
   return arr[arr.length - 1];
 };
+
+// COMBAT PACE — one dial for how fast a fight moves. The Reach was tuned
+// for deliberate, one-body-at-a-time combat; this pulls it toward the
+// arcade mech games (Gun Metal's boost-and-strafe cadence): quicker
+// triggers, faster rounds, longer dashes, hostiles that wake sooner and
+// close faster, and less hull per body so kills land in bursts. Every
+// frame keeps its relative balance (tools/balance.js reads the raw defs).
+GH.PACE = {
+  atkSpd: 1.3,       // primary (and vehicle strafe) cycle rate
+  projSpd: 1.35,     // player rounds fly faster ...
+  projLife: 0.82,    // ... and live a little shorter, so range grows ~10%
+  moveSpd: 1.12,     // frame walking speed
+  dashSpd: 34,       // boost dash units per second (was 26)
+  boostRegen: 1.25,  // dash meter refill
+  cdMult: 0.8,       // Combat Art and signature recharge
+  energyRegen: 1.25, // capacitor refill
+  enemySpd: 1.15,    // hostiles move ...
+  enemyShot: 1.3,    // ... and shoot faster ...
+  enemyFire: 0.8,    // ... more often ...
+  enemyHp: 1.0,      // ... with less hull each (the old build stacked ×1.5)
+  aggroMelee: 16,    // notice range (was 11)
+  aggroRanged: 22,   // (was 16)
+  leash: 44,         // give-up range (was 32)
+  packWake: 80,      // roaming packs wake this far out (was 65)
+  localCap: 26       // hostiles a nest field may hold at once (was 20)
+};

@@ -27,8 +27,8 @@ camera, vehicle physics and surface queries. Zones load in 0.2 to 1.0 s in a hea
 | null | VOID SANCTUM | shard ridges and chasms | void | low gravity (11 vs 24): long jumps |
 
 **Map edge.** A 16-unit cliff bank starts 10 units inside the playable edge, then mountains rise
-to about 60 units over the next 100, with ridged noise on top. Gate pads carve passes through the
-bank so travel gates stay reachable. Fog now runs 30 to 98 units in the open so hills and the rim
+to about 60 units over the next 100, with ridged noise on top. Portal pads carve level ground in the
+four corners so the travel portals stay reachable (see doc 14 for the world grid). Fog now runs 30 to 98 units in the open so hills and the rim
 read before the haze takes them. You cannot see off the map from any position or form.
 
 **Pads.** Camp, circuit ring, duel pit, gates, nests, relays, lairs, vaults, chests, objectives,

@@ -42,7 +42,9 @@ GH.controls = (function () {
   var ARROW_ALIASES = { ArrowUp: 'forward', ArrowDown: 'back', ArrowLeft: 'turnLeft', ArrowRight: 'turnRight' };
 
   C.binds = {};
-  C.settings = { sens: 1.0, invertY: false, crt: true, crtLevel: 'subtle', mouseTurn: true, music: 1.0, sfx: 1.0 };
+  // look: the post-process default. 2 = the FILM grade (glow, vignette,
+  // colour grade, no scanlines) that replaced the CRT-by-default look.
+  C.settings = { sens: 1.0, invertY: false, crt: true, crtLevel: 'film', mouseTurn: true, music: 1.0, sfx: 1.0, look: 2 };
 
   var STORE_KEY = 'hf_controls_v1';
 
@@ -54,6 +56,11 @@ GH.controls = (function () {
         var d = JSON.parse(raw);
         if (d.binds) for (var k in d.binds) if (C.binds[k] !== undefined) C.binds[k] = d.binds[k];
         if (d.settings) for (var s in d.settings) if (C.settings[s] !== undefined) C.settings[s] = d.settings[s];
+        // profiles saved before the FILM look move onto it once; anyone who
+        // wants the tube back picks Subtle or Strong under CONTROLS
+        if (!d.settings || !d.settings.look || d.settings.look < 2) {
+          C.settings.crt = true; C.settings.crtLevel = 'film'; C.settings.look = 2;
+        }
       }
     } catch (e) { /* storage unavailable */ }
   };
@@ -65,7 +72,7 @@ GH.controls = (function () {
 
   C.reset = function () {
     C.ACTIONS.forEach(function (a) { C.binds[a.id] = a.def; });
-    C.settings = { sens: 1.0, invertY: false, crt: true, crtLevel: 'subtle', mouseTurn: true, music: 1.0, sfx: 1.0 };
+    C.settings = { sens: 1.0, invertY: false, crt: true, crtLevel: 'film', mouseTurn: true, music: 1.0, sfx: 1.0, look: 2 };
     C.save();
   };
 

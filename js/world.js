@@ -1,6 +1,6 @@
 // STAALREUS — THE SHATTERED REACH
 // A zone-streamed world: each territory is its own HUGE map (500×500),
-// linked by travel gates, and every territory hides a gated DUNGEON —
+// linked by corner portals laid out on a world grid (see W.GRID), and every territory hides a gated DUNGEON —
 // a separate dark map holding its guardian packs, its sealed vault, and
 // the corrupt-frame lair at the far end. Only one zone is ever loaded;
 // zone builds are procedural and effectively instant, so travel is a
@@ -11,19 +11,52 @@ GH.world = (function () {
   W.OVERWORLD_SIZE = 500;   // one territory map
   W.DUNGEON_SIZE = 220;     // one dungeon map
 
-  // travel graph: which side of each territory carries the gate to whom
-  var GATE_SIDES = {
-    wreck: { glacier: 'W', cloister: 'E', hive: 'N' },
-    glacier: { wreck: 'E', ember: 'S' },
-    cloister: { wreck: 'W', storm: 'S', ruins: 'N' },
-    ember: { glacier: 'N', null: 'E', keep: 'S' },
-    storm: { cloister: 'N', null: 'W', warrens: 'S' },
-    null: { ember: 'W', storm: 'E', sky: 'N' },
-    hive: { wreck: 'S', ruins: 'E' },
-    ruins: { cloister: 'S', hive: 'W' },
-    keep: { ember: 'N', warrens: 'E' },
-    warrens: { keep: 'W', storm: 'N' },
-    sky: { null: 'S' }
+  // THE WORLD GRID — the Reach laid out like a real map. Every territory
+  // sits on a diamond lattice (col + row even) so its neighbours lie on
+  // the diagonals, and every travel portal stands in the CORNER of the
+  // map that points at its neighbour: leave the hub through the
+  // north-east portal and you arrive in the south-west corner of the
+  // Cloister, still walking north-east. Danger rises outward from the hub.
+  //
+  //            sky            ember           null
+  //                 glacier          cloister
+  //     warrens          [ wreck ]           storm
+  //                 hive             ruins
+  //                          keep
+  W.GRID = {
+    wreck: [0, 0],
+    glacier: [-1, -1], cloister: [1, -1], hive: [-1, 1], ruins: [1, 1],
+    ember: [0, -2], storm: [2, 0], keep: [0, 2], warrens: [-2, 0],
+    sky: [-2, -2], null: [2, -2]
+  };
+  // the four corners, as (sign x, sign z): z grows southward on the map
+  W.CORNERS = {
+    NW: { sx: -1, sz: -1, name: 'NORTH-WEST', arrow: '\u2196' },
+    NE: { sx: 1, sz: -1, name: 'NORTH-EAST', arrow: '\u2197' },
+    SW: { sx: -1, sz: 1, name: 'SOUTH-WEST', arrow: '\u2199' },
+    SE: { sx: 1, sz: 1, name: 'SOUTH-EAST', arrow: '\u2198' }
+  };
+  W.gridOf = function (zoneId) { return W.GRID[zoneId] || null; };
+  // which territory lies through each corner of this one (null = mountains)
+  W.neighbours = function (zoneId) {
+    var me = W.GRID[zoneId];
+    var out = {};
+    if (!me) return out;
+    for (var c in W.CORNERS) {
+      var cr = W.CORNERS[c];
+      var tx = me[0] + cr.sx, tz = me[1] + cr.sz;
+      out[c] = null;
+      for (var id in W.GRID) {
+        if (W.GRID[id][0] === tx && W.GRID[id][1] === tz) out[c] = id;
+      }
+    }
+    return out;
+  };
+  // the corner of `from` that leads to `to`, or null
+  W.cornerTo = function (from, to) {
+    var nb = W.neighbours(from);
+    for (var c in nb) if (nb[c] === to) return c;
+    return null;
   };
 
   W.ZONES = [
@@ -113,12 +146,13 @@ GH.world = (function () {
     };
   }
 
-  function gatePos(side, size) {
-    var m = size / 2 - 16;
-    if (side === 'N') return { x: 0, z: -m };
-    if (side === 'S') return { x: 0, z: m };
-    if (side === 'E') return { x: m, z: 0 };
-    return { x: -m, z: 0 };
+  // a corner portal stands a little further in than the old edge gates
+  // did: it is hemmed by the rim on two sides, and the road out of it
+  // needs room to turn toward the map's heart
+  function gatePos(corner, size) {
+    var m = size / 2 - 24;
+    var cr = W.CORNERS[corner] || W.CORNERS.NE;
+    return { x: cr.sx * m, z: cr.sz * m };
   }
 
   // ---------------------------------------------------------------
@@ -132,10 +166,11 @@ GH.world = (function () {
     var lay = { nests: [], gates: [], packs: [], relay: null, lair: null, vault: null, dungeonGate: null };
 
     if (!info.dungeon) {
-      var sides = GATE_SIDES[zoneId] || {};
-      for (var to in sides) {
-        var gp = gatePos(sides[to], size);
-        lay.gates.push({ to: to, x: gp.x, z: gp.z, side: sides[to] });
+      var nbs = W.neighbours(zoneId);
+      for (var corner in nbs) {
+        if (!nbs[corner]) continue;
+        var gp = gatePos(corner, size);
+        lay.gates.push({ to: nbs[corner], x: gp.x, z: gp.z, corner: corner, side: corner });
       }
       // FOUR dungeon gates per territory: the depths plus three more
       // archetypes from the zone's set. Each gate leads to the NEXT

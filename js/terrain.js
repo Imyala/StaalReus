@@ -390,7 +390,7 @@ GH.terrain = (function () {
   };
   T.BIOMES.sky = {
     name: 'AETHER COURT', ground: 'snow', gravity: 14, built: true, voidBelow: -30,
-    water: { level: -16, color: 0xe8ecf6, opacity: 0.96, cloud: true },
+    water: { level: -16, color: 0xc8d2ea, opacity: 0.96, cloud: true },
     macro: function (size, rnd, lay) {
       var isl = [{ x: 0, z: 0, r: 58, h: 0 }];
       lay.gates.forEach(function (g) { isl.push({ x: g.x, z: g.z, r: 26, h: 0 }); });
@@ -439,7 +439,8 @@ GH.terrain = (function () {
     soft: function () { return 0; },
     color: function (h, s, x, z, o) {
       var n = fbm(x * 0.12, z * 0.12, 113);
-      o[0] = 0.78 + n * 0.1; o[1] = 0.8 + n * 0.1; o[2] = 0.86;
+      // cloud marble a shade below white: the court used to wash out into its own haze
+      o[0] = 0.6 + n * 0.1; o[1] = 0.63 + n * 0.1; o[2] = 0.75;
       var gold = sstep(0.6, 0.8, fbm(x * 0.05, z * 0.05, 114)); o[0] += gold * 0.12; o[1] += gold * 0.06; o[2] -= gold * 0.2;
       var edge = sstep(-2, -6, h); o[0] -= edge * 0.3; o[1] -= edge * 0.3; o[2] -= edge * 0.2;
     },
@@ -802,7 +803,7 @@ GH.terrain = (function () {
     sky: [
       { kind: 'cloudPillar', solid: 0.7, n: 220, cluster: 0.45, seed: 1101, band: [-8, 99] },
       { kind: 'aetherTree', solid: 0.4, n: 420, cluster: 0.5, seed: 1102, band: [-8, 99] },
-      { kind: 'skyLantern', n: 360, cluster: 0.4, seed: 1103, band: [-8, 99] }
+      { kind: 'skyLantern', n: 70, cluster: 0.75, seed: 1103, band: [-8, 99] } // was 360: a sky full of lamps hid the view
     ],
     null: [
       { kind: 'crystal', solid: 0.8, n: 720, cluster: 0.5, seed: 601, band: [-99, 99] },

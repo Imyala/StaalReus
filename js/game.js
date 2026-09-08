@@ -3,7 +3,7 @@ GH.game = (function () {
   var G = {};
 
   // ---------- scene / world ----------
-  var scene, camera, hemi, sun, floor, wallRing, arenaProps;
+  var scene, camera, hemi, sun, rim, floor, wallRing, arenaProps;
   var ARENA_R = 33;
 
   // ---------- run state ----------
@@ -143,11 +143,16 @@ GH.game = (function () {
     GH.factions.notify = function (text, size) { if (G.state === 'play') queueAnnounce(text, size); };
     camera = new THREE.PerspectiveCamera(48, 16 / 9, 0.1, 220);
 
-    hemi = new THREE.HemisphereLight(0xbfe8ff, 0x24485a, 0.95);
+    // three-point light: a softer sky fill, a harder warm key, and a cool
+    // rim from behind so steel edges catch and frames stand off the ground
+    hemi = new THREE.HemisphereLight(0xbfe8ff, 0x24485a, 0.72);
     scene.add(hemi);
-    sun = new THREE.DirectionalLight(0xfff4d8, 0.9);
+    sun = new THREE.DirectionalLight(0xfff4d8, 1.15);
     sun.position.set(14, 13, 9); // low enough that slopes shade
     scene.add(sun);
+    rim = new THREE.DirectionalLight(0x7f96e0, 0.55);
+    rim.position.set(-12, 9, -15);
+    scene.add(rim);
 
     floor = new THREE.Mesh(
       new THREE.PlaneGeometry(120, 120),
@@ -939,7 +944,7 @@ GH.game = (function () {
         e.mesh.position.set(e.x, gy(e.x, e.z) + Math.sin(runTime * 30) * 0.03, e.z);
         continue;
       }
-      var spd = def.speed * (e.slowT > 0 ? 0.6 : 1) * (weekly ? weekly.mods.espd : 1) *
+      var spd = def.speed * GH.PACE.enemySpd * (e.slowT > 0 ? 0.6 : 1) * (weekly ? weekly.mods.espd : 1) *
         (e.speedMult || 1) *
         (expActive && weatherNow && weatherNow.id === 'whiteout' ? 0.85 : 1);
       if (inHazard('vines', e.x, e.z)) spd *= 0.65;
@@ -970,13 +975,13 @@ GH.game = (function () {
         else e.aggro = false;
       }
       if (expActive && !def.boss && !e.event) {
-        var aggroR = (def.behavior === 'ranged' ? 16 : 11) * (e.hostileHouse ? 2 : 1);
+        var aggroR = (def.behavior === 'ranged' ? GH.PACE.aggroRanged : GH.PACE.aggroMelee) * (e.hostileHouse ? 2 : 1);
         if (!e.aggro) {
           if (dist < aggroR || e.hp < e.maxHp) {
             e.aggro = true;
             e.popT = Math.max(e.popT, 0.15); // a startle pop when they notice you
           }
-        } else if (dist > 32) {
+        } else if (dist > GH.PACE.leash) {
           e.aggro = false;
         }
         if (!e.aggro) {
@@ -1094,7 +1099,7 @@ GH.game = (function () {
           e.hgt += (3.2 + Math.sin(e.anim) * 0.3 - e.hgt) * Math.min(1, dt * 3);
           e.shootCd -= dt;
           if (e.shootCd <= 0 && dist < 14) {
-            e.shootCd = def.shootInterval;
+            e.shootCd = def.shootInterval * GH.PACE.enemyFire;
             e.diveT = 0.7;
             GH.audio.dash();
           }
@@ -1205,7 +1210,7 @@ GH.game = (function () {
         }
         e.shootCd -= dt;
         if (e.shootCd <= 0 && dist < 16) {
-          e.shootCd = def.shootInterval;
+          e.shootCd = def.shootInterval * GH.PACE.enemyFire;
           spawnEnemyShot(e.x, 1, e.z, nx, nz, def.shotSpeed, e.damage);
         }
         // hover pose
@@ -1344,7 +1349,7 @@ GH.game = (function () {
       e.burstT -= dt;
       if (e.burstT <= 0) { e.burstT = 0.14; e.burstLeft--; volley(0.7); }
     } else if (e.shootCd <= 0 && dist < range) {
-      e.shootCd = def.shootInterval;
+      e.shootCd = def.shootInterval * GH.PACE.enemyFire;
       if (def.burst && def.burst > 1) { e.burstLeft = def.burst; e.burstT = 0; }
       else volley(0.9);
     }
@@ -1722,7 +1727,7 @@ GH.game = (function () {
       projectiles.push({
         mesh: m, x: originX, z: originZ,
         dirX: Math.sin(a), dirZ: Math.cos(a),
-        speed: w.speed * inst.mods.projSpd, life: w.life,
+        speed: w.speed * inst.mods.projSpd * GH.PACE.projSpd, life: w.life * GH.PACE.projLife,
         damage: dmg, inst: inst, elem: elem,
         pierce: w.pierce || 0, homing: w.homing || 0, aoe: w.aoe || 0,
         returning: w.type === 'boomerang', retAt: w.life * 0.45, returned: false,
@@ -1941,7 +1946,7 @@ GH.game = (function () {
       return;
     }
     player.energy -= ab.cost;
-    player.abilityCds[slot] = ab.cd * bon.cdMult * player.stats.artCd * GH.attrs.artRecharge(slot);
+    player.abilityCds[slot] = ab.cd * GH.PACE.cdMult * bon.cdMult * player.stats.artCd * GH.attrs.artRecharge(slot);
     tutorialEvent('ability', 1);
 
     if (slot === 1) {          // RUPTURE — focused strike
@@ -2007,7 +2012,7 @@ GH.game = (function () {
     if (needsTarget && (!target || target.dead)) { announce('NO TARGET — CLICK A HOSTILE', 16); return; }
     if (needsTarget && GH.dist2(player.x, player.z, target.x, target.z) > 18 * 18) { announce('OUT OF RANGE', 16); return; }
     player.energy -= sg.cost;
-    player.abilityCds[5] = sg.cd * player.skillBon.cdMult * player.stats.artCd * GH.attrs.artRecharge(5);
+    player.abilityCds[5] = sg.cd * GH.PACE.cdMult * player.skillBon.cdMult * player.stats.artCd * GH.attrs.artRecharge(5);
     announce(sg.name, 22);
     tutorialEvent('ability', 1);
     var i, e, a;
@@ -2102,7 +2107,7 @@ GH.game = (function () {
     // the capacitor always refills; cooldowns always tick
     // (a DAMPENED dungeon chokes the reactor)
     var enRate = dungeonState && dungeonState.modIds.dampened ? 0.55 : 1;
-    player.energy = Math.min(s.energyMax, player.energy + s.energyRegen * enRate * dt);
+    player.energy = Math.min(s.energyMax, player.energy + s.energyRegen * GH.PACE.energyRegen * enRate * dt);
     for (var c = 1; c <= 5; c++) {
       if (player.abilityCds[c] > 0) player.abilityCds[c] -= dt;
     }
@@ -2115,7 +2120,7 @@ GH.game = (function () {
       player.suppressed = false;
       if (!player.strafeInst) player.strafeInst = makeWeaponInst('strafe', STRAFE_DEF, false);
       var si = player.strafeInst;
-      si.timer -= dt * (s.atkSpdMult || 1);
+      si.timer -= dt * (s.atkSpdMult || 1) * GH.PACE.atkSpd;
       if (si.timer <= 0 && trigger) {
         si.timer = si.w.interval;
         var sAim = (target && !target.dead &&
@@ -2151,7 +2156,7 @@ GH.game = (function () {
 
     var inst = player.weapons[0];
     var w = inst.w;
-    var spdMult = s.atkSpdMult * frenzyMult() *
+    var spdMult = s.atkSpdMult * frenzyMult() * GH.PACE.atkSpd *
       (player.special.active > 0 && player.def.special === 'overdrive' ? 2 : 1) *
       inst.mods.atkSpdMult;
 
@@ -2660,7 +2665,7 @@ GH.game = (function () {
     m.scale.setScalar(elem === 'void' ? 0.3 : 0.22);
     m.position.set(x, y + gy(x, z), z);
     scene.add(m);
-    enemyShots.push({ mesh: m, x: x, y: y, z: z, dirX: dirX, dirZ: dirZ, speed: speed, damage: dmg, life: 4.5, elem: elem });
+    enemyShots.push({ mesh: m, x: x, y: y, z: z, dirX: dirX, dirZ: dirZ, speed: speed * GH.PACE.enemyShot, damage: dmg, life: 4.5 / GH.PACE.enemyShot, elem: elem });
   }
 
   // =================================================================
@@ -3734,7 +3739,7 @@ GH.game = (function () {
 
     player.blocking = player.def.special === 'block' && input.special && !player.speederOn;
 
-    var spd = s.speed * (player.blocking ? 0.55 : 1) * (player.sigKind === 'siege' ? 0.02 : 1);
+    var spd = s.speed * GH.PACE.moveSpd * (player.blocking ? 0.55 : 1) * (player.sigKind === 'siege' ? 0.02 : 1);
     if (player.protocols.vents && player.hp < s.maxHP * 0.35) spd *= 1.2;
     if (artOn('circuit_laurel')) spd *= 1.08;
     // a shouldered power core weighs on the servos
@@ -3774,8 +3779,8 @@ GH.game = (function () {
       player.z += player.velZ * dt;
     } else if (player.dashTime > 0) {
       player.dashTime -= dt;
-      player.x += player.dashX * 26 * dt;
-      player.z += player.dashZ * 26 * dt;
+      player.x += player.dashX * GH.PACE.dashSpd * dt;
+      player.z += player.dashZ * GH.PACE.dashSpd * dt;
       // ramming boost (AEGIS) / lunge slash (FANG)
       if (player.def.special === 'block' || player.dashKind === 'lunge') {
         for (var i = 0; i < enemies.length; i++) {
@@ -3858,7 +3863,7 @@ GH.game = (function () {
       player.z = GH.clamp(player.z, -ARENA_R, ARENA_R);
     }
 
-    player.boost = Math.min(1, player.boost + s.boostRegen * dt * (inRace && !player.speederOn ? 2 : 1));
+    player.boost = Math.min(1, player.boost + s.boostRegen * GH.PACE.boostRegen * dt * (inRace && !player.speederOn ? 2 : 1));
     if (input.boostPressed) { tryBoost(); input.boostPressed = false; }
     if (input.specialPressed) { trySpecial(); input.specialPressed = false; }
 
@@ -4227,14 +4232,14 @@ GH.game = (function () {
 
   function expeditionPlan(zone) {
     var st = GH.world.stageFor(zone.id);
-    // deliberate-combat tuning: fewer bodies, each one worth fighting.
+    // pace tuning lives in GH.PACE: more bodies that go down faster.
     // Dungeon tiers stack a garrison multiplier on top.
     var tm = zone.tier ? GH.dungeons.tierMult(zone.tier) : { hp: 1, dmg: 1 };
     return {
       duration: 999, rate: 0,
       types: st.roster(4 + zone.danger * 3),
       boss: null, midboss: null,
-      hpMult: (0.8 + (zone.danger - 1) * 0.9) * 1.5 * tm.hp * (tutorial ? 1 : GH.worldlife.band().ehp),
+      hpMult: (0.8 + (zone.danger - 1) * 0.9) * GH.PACE.enemyHp * tm.hp * (tutorial ? 1 : GH.worldlife.band().ehp),
       dmgMult: (0.9 + (zone.danger - 1) * 0.45) * tm.dmg * (tutorial ? 1 : GH.worldlife.band().edmg),
       overrun: false
     };
@@ -4325,11 +4330,21 @@ GH.game = (function () {
   var AMBIENT = { wreck: 'wind', glacier: 'wind', cloister: 'rain', ember: 'embers', storm: 'rain', null: 'hum',
     hive: 'city', ruins: 'wind', keep: 'wind', warrens: 'cave', sky: 'wind' };
 
-  function zoneFade() {
+  var zoneFadeTimer = null;
+  function zoneFade(dirText, nameText) {
     var f = document.getElementById('zone-fade');
     if (!f) return;
+    var t = document.getElementById('zone-fade-text');
+    if (t) {
+      if (nameText) {
+        t.innerHTML = '<div class="zf-dir">' + (dirText || '') + '</div><div class="zf-name">' + nameText + '</div>';
+        t.classList.remove('hidden');
+      } else t.classList.add('hidden');
+    }
     f.classList.add('on');
-    setTimeout(function () { f.classList.remove('on'); }, 280);
+    if (zoneFadeTimer) clearTimeout(zoneFadeTimer);
+    // a named crossing lingers like a GW2 zone card; a plain fade just blinks
+    zoneFadeTimer = setTimeout(function () { f.classList.remove('on'); zoneFadeTimer = null; }, nameText ? 950 : 280);
   }
 
   // look for the loaded zone: stage palette, or dungeon gloom
@@ -4436,20 +4451,30 @@ GH.game = (function () {
     GH.music.play(stage.id);
     wavePlan = expeditionPlan(zoneNow);
 
-    // arriving through a gate: appear beside its twin, facing inward
+    // arriving through a portal: appear beside its twin in the opposite
+    // corner, still walking the way you left — the camera swings to look
+    // into the new territory so travel reads as one continuous journey
+    var arrivedVia = null;
     if (fromZoneId && player) {
       var back = null;
       worldH.layout.gates.forEach(function (gt) { if (gt.to === fromZoneId) back = gt; });
       if (back) {
         var ina = Math.atan2(-back.x, -back.z);
-        player.x = back.x + Math.sin(ina) * 8;
-        player.z = back.z + Math.cos(ina) * 8;
+        player.x = back.x + Math.sin(ina) * 9;
+        player.z = back.z + Math.cos(ina) * 9;
+        if (!zoneNow.dungeon && back.corner) {
+          player.facing = ina;
+          camYaw = ina;
+          if (player.drive) player.drive.heading = ina;
+          arrivedVia = GH.world.cornerTo(fromZoneId, zoneId);
+        }
       } else {
         player.x = 0; player.z = 0;
       }
       travelCd = 2;
       if (mate) { mate.x = player.x + 2; mate.z = player.z + 1.5; }
     }
+    refreshZoneCompass();
 
     // the day's phenomena, where they belong
     if (harrowSpot && harrowSpot.zone === zoneId) {
@@ -4471,10 +4496,33 @@ GH.game = (function () {
 
     if (fromZoneId) {
       announce(zoneNow.name + ' — DANGER ' + ['I', 'II', 'III', 'IV'][zoneNow.danger - 1], 28);
-      zoneFade();
+      zoneFade(arrivedVia ? (GH.world.CORNERS[arrivedVia].arrow + ' ' + GH.world.CORNERS[arrivedVia].name) : (zoneNow.dungeon ? 'DESCENDING' : 'RETURNING'), zoneNow.name);
       saveExpedition();
     }
   }
+
+  // the HUD compass under the minimap: which territory lies through each
+  // corner portal of the loaded map, so travel always has a direction
+  function refreshZoneCompass() {
+    var el = document.getElementById('zone-compass');
+    if (!el) return;
+    if (!zoneNow || zoneNow.dungeon || !GH.world.gridOf(curZone)) { el.classList.add('hidden'); return; }
+    var nbs = GH.world.neighbours(curZone);
+    var html = '';
+    ['NW', 'NE', 'SW', 'SE'].forEach(function (c) {
+      var cr = GH.world.CORNERS[c];
+      var to = nbs[c];
+      var st = to ? GH.world.stageFor(to) : null;
+      var dz = to ? GH.world.zoneById(to).danger : 0;
+      html += '<div class="zc-row' + (to ? '' : ' zc-none') + '"><span class="zc-arrow">' + cr.arrow + '</span>' +
+        '<span class="zc-name">' + (st ? st.name : 'the mountains') + '</span>' +
+        (to ? '<span class="zc-danger">' + ['I', 'II', 'III', 'IV'][dz - 1] + '</span>' : '') + '</div>';
+    });
+    el.innerHTML = html;
+    el.classList.remove('hidden');
+  }
+  G.refreshZoneCompass = refreshZoneCompass;
+  G.currentZone = function () { return expActive ? curZone : null; };
 
   function travelZone(gate) {
     saveExpedition();
@@ -5726,7 +5774,7 @@ GH.game = (function () {
       for (var rp = 0; rp < worldH.layout.packs.length; rp++) {
         var pk = worldH.layout.packs[rp];
         if (!pk.roam || pk.spawned) continue;
-        if (GH.dist2(player.x, player.z, pk.x, pk.z) < 65 * 65) {
+        if (GH.dist2(player.x, player.z, pk.x, pk.z) < GH.PACE.packWake * GH.PACE.packWake) {
           pk.spawned = true;
           for (var pm = 0; pm < pk.n; pm++) {
             var ppick = GH.weightedPick(expeditionPlan(zoneNow).types);
@@ -5754,8 +5802,8 @@ GH.game = (function () {
       if (!ne.nestId || ne.dead) continue;
       ne.spawnT -= dt;
       var nd2 = GH.dist2(player.x, player.z, ne.x, ne.z);
-      if (ne.spawnT <= 0 && nd2 < 55 * 55 && localCount < 20) {
-        ne.spawnT = Math.max(1.8, 6 - ne.spawnZone.danger);
+      if (ne.spawnT <= 0 && nd2 < 60 * 60 && localCount < GH.PACE.localCap) {
+        ne.spawnT = Math.max(1.3, 4.6 - ne.spawnZone.danger * 0.8);
         var pick = GH.weightedPick(expeditionPlan(ne.spawnZone).types);
         var sa = Math.random() * Math.PI * 2;
         spawnEnemy(pick.id, ne.x + Math.cos(sa) * 4, ne.z + Math.sin(sa) * 4);
@@ -5809,7 +5857,11 @@ GH.game = (function () {
         }
       }
       if (gateNear && !siege) {
-        promptEl.textContent = '⇒ GATE: ' + GH.world.zoneInfo(gateNear.to).name;
+        var gInfo = GH.world.zoneInfo(gateNear.to);
+        var gCr = gateNear.corner ? GH.world.CORNERS[gateNear.corner] : null;
+        promptEl.textContent = gCr
+          ? gCr.arrow + ' ' + gCr.name + ' PORTAL: ' + gInfo.name + ' — DANGER ' + ['I', 'II', 'III', 'IV'][gInfo.danger - 1]
+          : (gateNear.exit ? '⇧ EXIT: ' : '⇒ GATE: ') + gInfo.name;
         promptEl.classList.remove('hidden');
       } else {
         promptEl.classList.add('hidden');
@@ -5970,13 +6022,22 @@ GH.game = (function () {
       ctx.arc(sx(GH.world.CIRCUIT.x), sz(GH.world.CIRCUIT.z), 5, 0, Math.PI * 2);
       ctx.stroke();
     }
-    // travel gates: bright doorways on the map edge
+    // portals: bright doorways in the corners, named for where they lead
     worldH.layout.gates.forEach(function (gt) {
       var dungeonGate = gt.to.indexOf('dungeon_') === 0;
       ctx.fillStyle = gt.exit ? '#ffd050' : dungeonGate ? '#c050ff' : '#60c8ff';
       ctx.fillRect(sx(gt.x) - 2.5, sz(gt.z) - 2.5, 5, 5);
       ctx.strokeStyle = ctx.fillStyle;
       ctx.strokeRect(sx(gt.x) - 4.5, sz(gt.z) - 4.5, 9, 9);
+      if (gt.corner) {
+        var cr = GH.world.CORNERS[gt.corner];
+        var nm = GH.world.stageFor(gt.to).name.split(' ')[0];
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = cr.sx < 0 ? 'left' : 'right';
+        ctx.fillStyle = '#bfe8ff';
+        ctx.fillText(nm, sx(gt.x) + (cr.sx < 0 ? 7 : -7), sz(gt.z) + (cr.sz < 0 ? 12 : -10));
+        ctx.textAlign = 'left';
+      }
     });
     worldH.layout.nests.forEach(function (n) {
       ctx.fillStyle = w.nests[n.id] ? '#4a5a4a' : '#ff5040';
@@ -7378,6 +7439,8 @@ GH.game = (function () {
     if (il) il.classList.add('hidden');
     var mm = document.getElementById('minimap');
     if (mm) mm.classList.add('hidden');
+    var zc = document.getElementById('zone-compass');
+    if (zc) zc.classList.add('hidden');
   }
 
   G.startRun = function (mechIndex, stageIdx, startAt, opts) {
@@ -7998,6 +8061,7 @@ GH.game = (function () {
       var g0 = worldH.layout.gates[0];
       var ina = Math.atan2(-g0.x, -g0.z);
       player.x = g0.x + Math.sin(ina) * 10; player.z = g0.z + Math.cos(ina) * 10;
+      player.facing = ina; camYaw = ina;
     }
     var sp0 = openSpot(player.x, player.z, 0.8);
     if (sp0) { player.x = sp0.x; player.z = sp0.z; }
@@ -8005,6 +8069,19 @@ GH.game = (function () {
     return true;
   };
   G.devEventNow = function () { zoneEventT = 0.01; return !!ZONE_EVENTS[curZone]; };
+  // dev/test: put the pilot at (x, z) facing `facing` radians; where am I
+  G.devPlace = function (x, z, facing) {
+    if (!player) return false;
+    player.x = x; player.z = z;
+    if (facing !== undefined) { player.facing = facing; camYaw = facing; }
+    camGround = gy(player.x, player.z);
+    return true;
+  };
+  G.devInfo = function () {
+    if (!player) return null;
+    return { zone: curZone, x: Math.round(player.x), z: Math.round(player.z), facing: player.facing,
+      gates: worldH ? worldH.layout.gates.filter(function (g) { return !g.arch; }).map(function (g) { return { to: g.to, x: Math.round(g.x), z: Math.round(g.z), corner: g.corner || g.side }; }) : [] };
+  };
   // dev/test: spawn any enemy beside the pilot; kill the live boss; today's hunt spot
   G.devSpawn = function (id, dx, dz) { if (!player || !GH.enemyDefs[id]) return null; var e = spawnEnemy(id, player.x + (dx || 8), player.z + (dz || 0)); if (e) e.aggro = true; return !!e; };
   G.devKillBoss = function () { if (bossRef && !bossRef.dead) { bossRef.shieldUp = false; damageEnemy(bossRef, 1e9, { canCrit: false }); if (bossRef && bossRef.hp <= 0) killEnemy(bossRef); return true; } return false; };

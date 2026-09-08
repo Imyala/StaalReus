@@ -11,7 +11,7 @@
 <div id="game-root">
   <canvas id="game-canvas"></canvas>
   <div id="crt-overlay"></div>
-  <div id="zone-fade"></div>
+  <div id="zone-fade"><div id="zone-fade-text" class="hidden"></div></div>
 
   <!-- ===================== HUD (during play) ===================== -->
   <div id="hud" class="hidden">
@@ -63,6 +63,7 @@
     <div id="interact-line" class="hidden"></div>
     <div id="hotbar"></div>
     <canvas id="minimap" class="hidden" width="176" height="176"></canvas>
+    <div id="zone-compass" class="hidden"></div>
     <div id="race-hud" class="hidden">
       <div id="race-lap"></div>
       <div id="race-time"></div>
@@ -254,7 +255,7 @@
   <!-- ===================== WORLD MAP ===================== -->
   <div id="map-screen" class="screen hidden">
     <div class="screen-head"><button id="btn-map-back" class="menu-btn tiny back-btn">◄ BACK</button><h2 class="select-title">THE&nbsp;SHATTERED&nbsp;REACH</h2><span class="esc-hint">ESC closes</span></div>
-    <div class="screen-sub wide">Every territory, its dungeons, today\'s weather and its DIARY. Why: diary tiers pay alloy and cores, and HARD/ELITE add a permanent perk in that zone.</div>
+    <div class="screen-sub wide">Every territory, its dungeons, today's weather and its DIARY. Why: diary tiers pay alloy and cores, and HARD/ELITE add a permanent perk in that zone.</div>
     <div id="map-head"></div>
     <div id="map-zones"></div>
   </div>
@@ -346,8 +347,8 @@
         <label class="ct-set">Mouse look sensitivity <input type="range" id="set-sens" min="20" max="300" step="10"> <span id="set-sens-val">100%</span></label>
         <label class="ct-set"><input type="checkbox" id="set-invert"> Invert vertical look</label>
         <label class="ct-set">Camera <select id="set-cam"><option value="chase">Chase (MMO)</option><option value="top">Tactical (top-down)</option></select></label>
-        <label class="ct-set"><input type="checkbox" id="set-crt"> CRT shader (scanlines, phosphor mask, glow, curve)</label>
-        <label class="ct-set">CRT strength <select id="set-crt-level"><option value="subtle">Subtle</option><option value="strong">Strong</option></select></label>
+        <label class="ct-set"><input type="checkbox" id="set-crt"> Screen shader (film grade or CRT tube)</label>
+        <label class="ct-set">Screen look <select id="set-crt-level"><option value="film">Film — glow, vignette, grade (default)</option><option value="subtle">CRT — subtle scanlines</option><option value="strong">CRT — strong tube</option></select></label>
         <label class="ct-set"><input type="checkbox" id="set-mute"> Mute sound</label>
         <label class="ct-set">Music volume <input type="range" id="set-music" min="0" max="100" step="5"> <span id="set-music-val"></span></label>
         <label class="ct-set">Effects volume <input type="range" id="set-sfx" min="0" max="100" step="5"> <span id="set-sfx-val"></span></label>

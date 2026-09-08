@@ -49,7 +49,14 @@ has up to four **portals, one in each corner**, and each corner points at the ne
 that direction: leave the hub through the north-east portal and you arrive in the south-west corner of
 the Verdant Cloister, still walking north-east. A zone compass under the minimap names what lies
 through each corner, the minimap labels every portal, and the WORLD MAP (M) draws the whole grid.
-Danger rises outward from the hub; no territory is more than two crossings away.
+Danger rises outward from the hub; no territory is more than two crossings away. Territories you have
+stood in become **waypoints**: click them on the map to travel for salvage.
+
+The Reach acts on its own: every minute or so a **dynamic event** lights up somewhere in the territory
+(escort a hauler, hold a portal against a push, relight three dark beacons, a bounty on a nest) with a
+tracker, a timer and a bearing on the HUD, and pays on completion. Crashed hulks can be scavenged.
+In a fight, a boost dash through an attack shows **EVADE** and refunds meter, quick kills stack a
+**CHAIN** multiplier with salvage milestones, and transforming fires a shockwave.
 Details: `docs/design/14-world-grid-pace-look.md` (also the combat pace dial `GH.PACE` in `js/util.js`).
 
 ## The 135 frames

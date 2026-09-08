@@ -1647,6 +1647,13 @@
     for (var c in nbs) if (nbs[c]) nextSet[nbs[c]] = GH.world.CORNERS[c];
     var hd = GH.meta.data.huntsToday || { day: null, slain: {} };
     var todaySlain = hd.day === GH.world.dayStamp() ? hd.slain : {};
+    var visited = GH.meta.data.world.visited || {};
+    var flash = document.getElementById('map-flash');
+    if (!flash) {
+      flash = document.createElement('div'); flash.id = 'map-flash';
+      host.parentNode.insertBefore(flash, host);
+    }
+    flash.textContent = cur ? 'WAYPOINT: click a territory you have stood in to travel there for salvage.' : '';
     for (var row = -2; row <= 2; row++) {
       for (var col = -2; col <= 2; col++) {
         var id = null;
@@ -1657,10 +1664,23 @@
         var zn = GH.world.zoneById(id);
         tile.className = 'mg-tile' + (id === 'wreck' ? ' hub' : '') + (id === curParent ? ' here' : '') + (nextSet[id] ? ' next' : '');
         var hunt = GH.bosses.todayFor(id, GH.world.dayStamp(), todaySlain);
+        var canWp = !!(cur && visited[id] && id !== curParent && GH.game.waypointTo);
+        var wpLine = canWp ? '<div class="mg-wp">WAYPOINT · ' + GH.game.waypointCost(id) + ' S</div>'
+          : (!visited[id] && id !== curParent ? '<div class="mg-unx">UNEXPLORED</div>' : '');
         tile.innerHTML = '<div>' + (nextSet[id] ? '<span style="color:#60c8ff">' + nextSet[id].arrow + '</span> ' : '') + st.name + '</div>' +
-          '<div class="mg-danger">DANGER ' + ['I', 'II', 'III', 'IV'][zn.danger - 1] + '</div>' +
+          '<div class="mg-danger">DANGER ' + ['I', 'II', 'III', 'IV'][zn.danger - 1] + '</div>' + wpLine +
           (hunt ? '<span class="mg-hunt" title="' + hunt.name + '">☠</span>' : '');
         tile.title = st.biome || st.name;
+        if (canWp) {
+          tile.classList.add('wp');
+          tile.onclick = (function (zid) {
+            return function () {
+              var r = GH.game.waypointTo(zid);
+              if (r.ok) resumeExpedition();
+              else { GH.audio.hit(); flash.textContent = r.why; }
+            };
+          })(id);
+        }
         host.appendChild(tile);
       }
     }

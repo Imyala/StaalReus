@@ -534,6 +534,36 @@ body.looking #crosshair { opacity: 0.4; }
   color: #90f0a0; text-shadow: 1px 1px 0 #000;
 }
 
+/* dynamic event tracker (right column, GW2-style) */
+#event-panel {
+  margin-top: 8px; width: 250px; padding: 6px 8px 7px;
+  background: rgba(10, 8, 4, 0.82);
+  border: 1px solid #c8782a; border-left-width: 4px;
+  box-shadow: 0 0 0 1px #000, 0 0 14px rgba(232, 140, 40, 0.25);
+  text-align: left; animation: announce-pop 0.3s ease-out;
+}
+#ev-title { font-family: var(--font-head); font-weight: bold; font-size: 13px; letter-spacing: 2px; color: #ffb35c; text-shadow: 1px 1px 0 #000; }
+#ev-line { font-size: 11px; color: var(--parchment); margin-top: 2px; line-height: 1.35; }
+.ev-frame { width: 100%; height: 8px; margin-top: 5px; }
+.ev-fill { background: linear-gradient(#ffb060, #b8601a); }
+#ev-meta { font-size: 10px; color: var(--parch2); margin-top: 3px; display: flex; justify-content: space-between; }
+#ev-meta b { color: #ffd050; }
+#event-panel.failing { border-color: #d04030; }
+#event-panel.done { border-color: #60c890; }
+
+/* kill chain (arcade counter under the target) */
+#chain-panel { margin-top: 6px; animation: announce-pop 0.2s ease-out; }
+#chain-text { font-family: var(--font-head); font-weight: bold; font-size: 18px; letter-spacing: 2px; color: #ffd050; text-shadow: 2px 2px 0 #000; }
+#chain-text.hot { color: #ff8a3a; }
+.chain-frame { width: 140px; height: 5px; margin: 2px auto 0; }
+.chain-fill { background: linear-gradient(#ffd050, #b8801a); }
+
+.mg-tile.wp { cursor: pointer; }
+.mg-tile.wp:hover { border-color: var(--gold); background: linear-gradient(rgba(60, 48, 28, 0.98), rgba(30, 24, 14, 0.98)); }
+.mg-tile .mg-wp { font-family: var(--font-body); font-size: 8px; color: #60c8ff; letter-spacing: 1px; }
+.mg-tile .mg-unx { font-family: var(--font-body); font-size: 8px; color: var(--dim); letter-spacing: 1px; }
+#map-flash { font-family: var(--font-head); font-size: 12px; color: #ff8a5a; min-height: 16px; margin-bottom: 4px; }
+
 /* ---------------- stage select ---------------- */
 
 #stage-list { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; max-width: 1100px; }
@@ -1279,6 +1309,10 @@ body.looking #crosshair { opacity: 0.4; }
           <div id="target-name">???</div>
           <div class="bar-frame target-frame"><div id="target-fill" class="bar-fill target-fill"></div></div>
         </div>
+        <div id="chain-panel" class="hidden">
+          <div id="chain-text">CHAIN ×2</div>
+          <div class="bar-frame chain-frame"><div id="chain-fill" class="bar-fill chain-fill"></div></div>
+        </div>
       </div>
       <div id="hud-right">
         <div class="bar-frame xp-frame">
@@ -1286,6 +1320,12 @@ body.looking #crosshair { opacity: 0.4; }
           <div id="lvl-text" class="bar-text">LVL 1</div>
         </div>
         <div id="stat-icons"></div>
+        <div id="event-panel" class="hidden">
+          <div id="ev-title"></div>
+          <div id="ev-line"></div>
+          <div class="bar-frame ev-frame"><div id="ev-fill" class="bar-fill ev-fill"></div></div>
+          <div id="ev-meta"></div>
+        </div>
       </div>
     </div>
     <div id="boss-bar-wrap" class="hidden">
@@ -6894,6 +6934,7 @@ GH.meta = (function () {
         raceBest: 0,        // best circuit time in ms (0 = none)
         duelWins: 0,
         harrowDay: null,    // date stamp of the last day THE HARROW fell
+        visited: {},        // zone id -> true (stood in it; unlocks its WAYPOINT)
         fac: null           // houses: reputation, stains, pledge, banner (see factions.js)
       },
       // pilot skill tree: nodeId -> rank, plus unspent points and the
@@ -11497,6 +11538,11 @@ GH.world = (function () {
     if (layout.relic) {
       list.push({ kind: 'relic', x: layout.relic.x, z: layout.relic.z, label: 'SEIZE THE RELIC (THE ALARM WILL SOUND)' });
     }
+    // crashed hulks can be picked over once per visit: salvage, alloy, and
+    // now and then whatever was already picking over them
+    (layout.ruins || []).forEach(function (rn) {
+      if (rn.kind === 'hulk') list.push({ kind: 'hulk', x: rn.x, z: rn.z, label: 'SCAVENGE THE HULK' });
+    });
     return list;
   };
 
@@ -12304,7 +12350,8 @@ GH.game = (function () {
   }
 
   function playerDamage(raw, srcE, dmgType) {
-    if (!player || player.hp <= 0 || player.dashTime > 0.12 || GH.devGod) return;
+    if (!player || player.hp <= 0 || GH.devGod) return;
+    if (player.dashTime > 0.12) { onEvade(); return; }
     if (player.shieldT > 0) { G.dmg.spawn(player.x, 2.6, player.z, 'SHIELD', 'heal', 14); return; }
     var s = player.stats;
     if (player.speederOn) raw *= 1.25; // skimmer hull is thin — speed is the armor
@@ -12623,6 +12670,8 @@ GH.game = (function () {
     if (e.dead) return;
     e.dead = true;
     kills++;
+    if (!e.nestId && !e.allied) onChainKill(e);
+    if (e.dynAttacker && dyn && dyn.kind === 'hold' && !dyn.done) dyn.kills++;
     if (e.def.boss) G.hitStop(0.14);
     else if (e.def.mass >= 3) G.hitStop(0.06);
     scene.remove(e.mesh);
@@ -12848,10 +12897,13 @@ GH.game = (function () {
         }
       }
       // CONVOY ambushers run down the hauler
-      if (e.huntHauler && dungeonState && dungeonState.hauler && !dungeonState.failed) {
-        if (GH.dist2(e.x, e.z, player.x, player.z) > 9 * 9) {
-          tgtP = { x: dungeonState.hauler.x, z: dungeonState.hauler.z };
-        }
+      var hh = e.huntHauler ? haulerTarget() : null;
+      if (hh && GH.dist2(e.x, e.z, player.x, player.z) > 9 * 9) {
+        tgtP = { x: hh.x, z: hh.z };
+      }
+      // HOLD THE PORTAL attackers press the portal unless you are on them
+      if (e.dynAttacker && dyn && dyn.kind === 'hold' && !dyn.done) {
+        if (GH.dist2(e.x, e.z, player.x, player.z) > 8 * 8) tgtP = { x: dyn.x, z: dyn.z };
       }
       var dx = tgtP.x - e.x, dz = tgtP.z - e.z;
       var dist = Math.sqrt(dx * dx + dz * dz) || 0.001;
@@ -14710,7 +14762,7 @@ GH.game = (function () {
   function sparkGain(v, silent) {
     if (G.mode !== 'weekly' && GH.progress.hasRelic('gravity')) v *= 1.15;
     if (anyHybrid('quicksilver')) player.boost = Math.min(1, player.boost + 0.02);
-    gainXP(v);
+    gainXP(v * chainMult());
     sparksRun += v;
     if (sparksRun >= 40) awardTrial('sparks40');
     seasonAwardNotify(GH.progress.seasonCounter('sparks', v));
@@ -16123,7 +16175,7 @@ GH.game = (function () {
     if (!zoneEvent) {
       if (zoneEventT <= 0) return;
       zoneEventT -= dt;
-      if (zoneEventT > 0 || siege || dungeonState) return;
+      if (zoneEventT > 0 || siege || dungeonState || dyn) return;
       zoneEvent = { def: def, t: 0, wave: 0, waveT: 1.5, done: false, savedWeather: weatherNow };
       announce(def.name + ' — ' + def.line, 26);
       GH.music.setBoss(true);
@@ -16264,6 +16316,10 @@ GH.game = (function () {
   // ------------------------------------------------------------
   var curZone = 'wreck';
   var travelCd = 0; // keeps a fresh arrival from bouncing back through
+  // DYNAMIC EVENTS (GW2-style, see the section below), the arcade kill
+  // chain, and the evade bookkeeping
+  var dyn = null, dynT = 0, dynMeshes = [], dynDomT = 0;
+  var chain = { n: 0, t: 0, best: 0, next: 0 };
   var AMBIENT = { wreck: 'wind', glacier: 'wind', cloister: 'rain', ember: 'embers', storm: 'rain', null: 'hum',
     hive: 'city', ruins: 'wind', keep: 'wind', warrens: 'cave', sky: 'wind' };
 
@@ -16331,6 +16387,7 @@ GH.game = (function () {
     if (harrowTotem) { scene.remove(harrowTotem); harrowTotem = null; }
     if (dungeonState && dungeonState.haulerMesh) scene.remove(dungeonState.haulerMesh);
     harrowUp = false;
+    clearDyn();
 
     curZone = zoneId;
     var w = GH.meta.data.world;
@@ -16340,6 +16397,7 @@ GH.game = (function () {
     GH.atmos.set(scene, zoneId, !!worldH.info.dungeon);
     camGround = player ? gy(player.x, player.z) : 0;
     zoneNow = worldH.info;
+    if (!zoneNow.dungeon) { w.visited = w.visited || {}; w.visited[zoneId] = true; }
     interactables = GH.world.interactables(worldH.layout, zoneId);
     // alloy veins (Albion-style gathering): richer in dangerous territory
     veins = GH.worldlife.nodesFor(zoneId, GH.world.BOUNDS);
@@ -16429,6 +16487,7 @@ GH.game = (function () {
     if (zoneNow.dungeon) initDungeon();
     if (player) camGround = gy(player.x, player.z);
     scheduleZoneEvent();
+    scheduleDyn(fromZoneId ? 18 : 30);
     GH.audio.ambient(AMBIENT[stage.id] || 'wind');
 
     if (fromZoneId) {
@@ -17639,6 +17698,8 @@ GH.game = (function () {
     }
     updateDungeon(dt);
     updateZoneEvent(dt);
+    updateDyn(dt);
+    updateChain(dt);
     updateItemPads(dt);
     if (hazards.length) updateHazards(dt);
 
@@ -17770,6 +17831,7 @@ GH.game = (function () {
     nearInteract = null;
     for (var ii = 0; ii < interactables.length; ii++) {
       var it = interactables[ii];
+      if (it.done) continue;
       if (it.kind === 'relay' && w.relaysHeld[it.id]) continue;
       if (it.kind === 'vault' && (w.vaults[it.id] || cipherRun)) continue;
       if (it.kind === 'chest' && (!dungeonState || dungeonState.opened)) continue;
@@ -17825,6 +17887,8 @@ GH.game = (function () {
           }
         }
         else if (nearInteract.kind === 'vein') mineVein(nearInteract);
+        else if (nearInteract.kind === 'hulk') scavengeHulk(nearInteract);
+        else if (nearInteract.kind === 'beacon') lightBeacon(nearInteract);
         else if (nearInteract.kind === 'chest') {
           if (chestReady()) openChest();
           else {
@@ -17976,6 +18040,12 @@ GH.game = (function () {
         ctx.textAlign = 'left';
       }
     });
+    // a live dynamic event: the orange ring, pulsing
+    if (dyn && !dyn.done) {
+      ctx.strokeStyle = '#ffa040'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(sx(dyn.x), sz(dyn.z), 6 + Math.sin(runTime * 4) * 1.5, 0, Math.PI * 2); ctx.stroke();
+      ctx.lineWidth = 1;
+    }
     worldH.layout.nests.forEach(function (n) {
       ctx.fillStyle = w.nests[n.id] ? '#4a5a4a' : '#ff5040';
       ctx.fillRect(sx(n.x) - 2, sz(n.z) - 2, 4, 4);
@@ -18187,6 +18257,7 @@ GH.game = (function () {
     }
     GH.audio.dash();
     spawnBurst(player.x, 1, player.z, 0x70c0ff, 14);
+    transformBurst();
     announce(player.speederOn
       ? player.vec.name + ' — ' + GH.controls.label('boost') + ' DRIFTS, ' + GH.controls.label('special') + ' BURNS NITRO' : 'FRAME FORM', 22);
   }
@@ -19984,6 +20055,477 @@ GH.game = (function () {
       pilot: GH.skills.pilotProgress().lvl,
       skillRanks: GH.skills.spentTotal()
     };
+  };
+
+
+  // =================================================================
+  // DYNAMIC EVENTS — the Reach does things whether you are there or not.
+  // Every territory rolls one every minute or so (GW2's open-world event
+  // model): a place is marked orange on the map, a tracker on the right
+  // names the job, and finishing it pays. Four kinds:
+  //   ESCORT  — a hauler rolls from a portal toward the heart; ambushes.
+  //   HOLD    — hostiles push a corner portal; kill them before it falls.
+  //   BEACONS — relight three dark beacons (F); each wakes what sleeps.
+  //   NEST    — the nearest live nest is called out with a bounty.
+  // Nothing stops the other systems: sieges, vault trials and the built
+  // territories' own zone events still run, just never at the same time.
+  // =================================================================
+  function scheduleDyn(delay) {
+    dyn = null;
+    dynT = zoneNow && !zoneNow.dungeon ? (delay || 30) + Math.random() * 25 : 0;
+  }
+  function clearDyn() {
+    dynMeshes.forEach(function (m) { if (m.parent) m.parent.remove(m); });
+    dynMeshes.length = 0;
+    if (dyn && dyn.beacons) {
+      for (var bi = interactables.length - 1; bi >= 0; bi--) if (interactables[bi].kind === 'beacon') interactables.splice(bi, 1);
+    }
+    if (dyn && !dyn.done) GH.music.setBoss(false);
+    dyn = null;
+    var ep = document.getElementById('event-panel');
+    if (ep) ep.classList.add('hidden');
+  }
+  function haulerTarget() {
+    if (dungeonState && dungeonState.hauler && !dungeonState.failed) return dungeonState.hauler;
+    if (dyn && dyn.kind === 'escort' && dyn.hauler && !dyn.done) return dyn.hauler;
+    return null;
+  }
+  function dynMarker(x, z, color) {
+    var g = new THREE.Group();
+    var beam = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1.4, 30, 8, 1, true),
+      GH.assets.basic(color, { transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }));
+    beam.position.y = 15;
+    var ring = new THREE.Mesh(new THREE.RingGeometry(5.2, 6.0, 28),
+      GH.assets.basic(color, { transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
+    ring.rotation.x = -Math.PI / 2; ring.position.y = 0.15;
+    g.add(beam, ring);
+    g.userData.ring = ring;
+    g.position.set(x, gy(x, z), z);
+    scene.add(g);
+    dynMeshes.push(g);
+    return g;
+  }
+  function buildBeaconMesh() {
+    var g = new THREE.Group();
+    var base = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.4, 0.6, 8), GH.assets.mat(0x3a3f4c));
+    base.position.y = 0.3;
+    var pole = new THREE.Mesh(new THREE.BoxGeometry(0.5, 5.4, 0.5), GH.assets.mat(0x50586a));
+    pole.position.y = 3.0;
+    var lamp = new THREE.Mesh(new THREE.OctahedronGeometry(0.7),
+      new THREE.MeshBasicMaterial({ color: 0x30262a, transparent: true, opacity: 0.95 }));
+    lamp.position.y = 6.2;
+    g.add(base, pole, lamp);
+    g.userData.lamp = lamp;
+    return g;
+  }
+  function travelGates() {
+    return worldH ? worldH.layout.gates.filter(function (g) { return g.corner; }) : [];
+  }
+  function heartOf() {
+    return curZone === 'wreck' ? { x: GH.world.CAMP.x, z: GH.world.CAMP.z } : { x: 0, z: 0 };
+  }
+
+  function startDyn(kind) {
+    if (dyn || !zoneNow || zoneNow.dungeon || !player) return false;
+    var dz = zoneNow.danger;
+    var gates = travelGates();
+    var w = GH.meta.data.world;
+    if (!kind) {
+      var pool = ['escort', 'hold', 'beacons', 'beacons', 'escort', 'hold'];
+      var liveNest = worldH.layout.nests.some(function (n) { return !w.nests[n.id]; });
+      if (liveNest) pool.push('nest', 'nest');
+      if (!gates.length) pool = pool.filter(function (k) { return k !== 'escort' && k !== 'hold'; });
+      kind = GH.pick(pool);
+    }
+    dyn = { kind: kind, t: 0, done: false, failed: false, kills: 0, x: 0, z: 0, pay: 0, idleT: 0 };
+    if (kind === 'escort') {
+      // start at the portal nearest the pilot, roll toward the heart
+      var best = null, bd = 1e12;
+      gates.forEach(function (g) { var d = GH.dist2(player.x, player.z, g.x, g.z); if (d < bd) { bd = d; best = g; } });
+      var heart = heartOf();
+      var path = [];
+      var steps = 7;
+      for (var i = 0; i <= steps; i++) {
+        var t = 0.06 + (i / steps) * 0.78;
+        var px = best.x + (heart.x - best.x) * t, pz = best.z + (heart.z - best.z) * t;
+        var sp = openSpot(px, pz, 2.0);
+        if (sp) { px = sp.x; pz = sp.z; }
+        path.push({ x: px, z: pz, ambush: i === 2 || i === 5 });
+      }
+      dyn.path = path;
+      dyn.hauler = { x: path[0].x, z: path[0].z, hp: 140 + 70 * dz, max: 140 + 70 * dz, wp: 1, fired: {} };
+      dyn.haulerMesh = GH.models.buildHauler();
+      dyn.haulerMesh.position.set(path[0].x, gy(path[0].x, path[0].z), path[0].z);
+      scene.add(dyn.haulerMesh);
+      dynMeshes.push(dyn.haulerMesh);
+      dyn.x = path[0].x; dyn.z = path[0].z;
+      dyn.marker = dynMarker(dyn.x, dyn.z, 0xffa040);
+      dyn.title = 'ESCORT THE HAULER';
+      dyn.line = 'Walk with the caravan from the ' + GH.world.CORNERS[best.corner].name.toLowerCase() + ' portal to the heart of the territory. It only rolls while you are near.';
+      dyn.pay = 55 * dz;
+    } else if (kind === 'hold') {
+      // one of the two portals nearest the pilot: an event you can reach
+      var sorted = gates.slice().sort(function (a, b) { return GH.dist2(player.x, player.z, a.x, a.z) - GH.dist2(player.x, player.z, b.x, b.z); });
+      var hg = GH.pick(sorted.slice(0, 2));
+      dyn.x = hg.x; dyn.z = hg.z;
+      dyn.gate = hg;
+      dyn.need = 8 + 3 * dz;
+      dyn.spawned = 0;
+      dyn.waveT = 3;
+      dyn.integrity = 1;
+      dyn.limit = 75;
+      dyn.marker = dynMarker(dyn.x, dyn.z, 0xffa040);
+      dyn.title = 'HOLD THE ' + GH.world.CORNERS[hg.corner].name + ' PORTAL';
+      dyn.line = 'Hostiles are pushing on the portal to ' + GH.world.stageFor(hg.to).name + '. Cut down ' + dyn.need + ' before the veil tears.';
+      dyn.pay = 45 * dz;
+    } else if (kind === 'beacons') {
+      dyn.beacons = [];
+      var cx = player.x, cz = player.z;
+      for (var b = 0; b < 3; b++) {
+        var ba = Math.random() * Math.PI * 2, br = 28 + Math.random() * 30;
+        var bx = GH.clamp(cx + Math.cos(ba) * br, -GH.world.BOUNDS.x + 30, GH.world.BOUNDS.x - 30);
+        var bz = GH.clamp(cz + Math.sin(ba) * br, -GH.world.BOUNDS.z + 30, GH.world.BOUNDS.z - 30);
+        var bs = openSpot(bx, bz, 1.5); if (bs) { bx = bs.x; bz = bs.z; }
+        var bm = buildBeaconMesh();
+        bm.position.set(bx, gy(bx, bz), bz);
+        scene.add(bm); dynMeshes.push(bm);
+        var beacon = { x: bx, z: bz, lit: false, mesh: bm };
+        dyn.beacons.push(beacon);
+        interactables.push({ kind: 'beacon', beacon: beacon, x: bx, z: bz, label: 'RELIGHT THE BEACON' });
+      }
+      dyn.x = dyn.beacons[0].x; dyn.z = dyn.beacons[0].z;
+      dyn.marker = dynMarker(dyn.x, dyn.z, 0xffa040);
+      dyn.limit = 80;
+      dyn.title = 'RELIGHT THE BEACONS';
+      dyn.line = 'Three beacons have gone dark nearby. Stand at each and press ' + GH.controls.label('interact') + '. Whatever sleeps beside them will not like the light.';
+      dyn.pay = 40 * dz;
+    } else if (kind === 'nest') {
+      var nb = null, nd = 1e12;
+      worldH.layout.nests.forEach(function (n) {
+        if (w.nests[n.id]) return;
+        var d = GH.dist2(player.x, player.z, n.x, n.z);
+        if (d < nd) { nd = d; nb = n; }
+      });
+      if (!nb) { dyn = null; return false; }
+      dyn.nest = nb;
+      dyn.x = nb.x; dyn.z = nb.z;
+      dyn.marker = dynMarker(dyn.x, dyn.z, 0xff6040);
+      dyn.limit = 150;
+      dyn.title = 'BOUNTY — BREAK THE NEST';
+      dyn.line = 'A nest is spawning into the territory. Its core is the target; everything it fields dies with it.';
+      dyn.pay = 35 * dz;
+    }
+    announce('EVENT — ' + dyn.title, 26);
+    GH.audio.levelup();
+    GH.music.setBoss(true);
+    dynDomT = 0;
+    return true;
+  }
+
+  function finishDyn(ok) {
+    if (!dyn || dyn.done) return;
+    dyn.done = true;
+    dyn.failed = !ok;
+    dyn.doneT = 4;
+    GH.music.setBoss(false);
+    if (ok) {
+      var dz = zoneNow.danger;
+      coinsRun += dyn.pay;
+      grantMats(3 * dz + 2, Math.random() < 0.12 * dz ? 1 : 0, false);
+      gainXP(6 + 3 * dz);
+      announce('EVENT COMPLETE — +' + dyn.pay + ' SALVAGE', 30);
+      GH.audio.win();
+      GH.factions.deed(curZone, 'event', 2);
+      lifeEvent('events', 1);
+    } else {
+      announce('EVENT FAILED — ' + (dyn.failLine || 'THE REACH MOVES ON'), 26);
+      GH.audio.hurt();
+    }
+    // hostiles the event fielded stand down and wander home
+    for (var i = 0; i < enemies.length; i++) {
+      var e = enemies[i];
+      if (e.dynAttacker || (e.huntHauler && dyn.kind === 'escort')) { e.event = false; e.dynAttacker = false; e.huntHauler = false; }
+    }
+    saveExpedition();
+  }
+
+  function updateDyn(dt) {
+    if (!zoneNow || zoneNow.dungeon || !player) return;
+    if (!dyn) {
+      if (dynT <= 0) return;
+      if (siege || cipherRun || zoneEvent || tutorial) return;
+      dynT -= dt;
+      if (dynT <= 0) { if (!startDyn()) dynT = 20; }
+      return;
+    }
+    if (dyn.done) {
+      dyn.doneT -= dt;
+      if (dyn.doneT <= 0) { clearDyn(); scheduleDyn(40); }
+      renderDynPanel();
+      return;
+    }
+    dyn.t += dt;
+    var dz = zoneNow.danger;
+    var dp = Math.sqrt(GH.dist2(player.x, player.z, dyn.x, dyn.z));
+    if (dyn.marker && dyn.marker.userData.ring) dyn.marker.userData.ring.scale.setScalar(1 + Math.sin(runTime * 3) * 0.08);
+
+    if (dyn.kind === 'escort') {
+      var h = dyn.hauler, path = dyn.path;
+      var wp = path[h.wp];
+      var wd2 = GH.dist2(h.x, h.z, wp.x, wp.z);
+      if (wd2 < 9 && wp.ambush && !h.fired[h.wp]) {
+        h.fired[h.wp] = true;
+        announce('AMBUSH ON THE CARAVAN!', 26);
+        GH.audio.boss();
+        for (var am = 0; am < 3 + dz; am++) {
+          var aa = Math.random() * Math.PI * 2;
+          var ae = spawnEnemy(GH.weightedPick(wavePlan.types).id, h.x + Math.cos(aa) * GH.rand(11, 16), h.z + Math.sin(aa) * GH.rand(11, 16));
+          if (ae) { ae.aggro = true; ae.event = true; ae.huntHauler = true; }
+        }
+      }
+      if (wd2 < 9) {
+        h.wp++;
+        if (h.wp >= path.length) { dyn.progress = 1; finishDyn(true); return; }
+      }
+      var hunters = 0;
+      for (var hu = 0; hu < enemies.length; hu++) {
+        var hue = enemies[hu];
+        if (!hue.dead && hue.huntHauler && GH.dist2(hue.x, hue.z, h.x, h.z) < 8 * 8) hunters++;
+      }
+      var near = GH.dist2(player.x, player.z, h.x, h.z) < 30 * 30;
+      if (hunters === 0 && near) {
+        var wa = GH.angleTo(h.x, h.z, wp.x, wp.z);
+        h.x += Math.sin(wa) * 4.2 * dt; h.z += Math.cos(wa) * 4.2 * dt;
+        dyn.haulerMesh.rotation.y = wa;
+        var legs = dyn.haulerMesh.userData.legs || [];
+        for (var lg = 0; lg < legs.length; lg++) legs[lg].rotation.x = Math.sin(runTime * 8 + lg) * 0.35;
+      }
+      if (hunters > 0) h.hp -= Math.min(hunters, 6) * (2 + dz * 0.8) * dt;
+      dyn.x = h.x; dyn.z = h.z;
+      dyn.haulerMesh.position.set(h.x, gy(h.x, h.z), h.z);
+      if (dyn.marker) dyn.marker.position.set(h.x, gy(h.x, h.z), h.z);
+      dyn.progress = (h.wp - 1 + GH.clamp(1 - Math.sqrt(wd2) / 40, 0, 1)) / (path.length - 1);
+      dyn.meta = 'HULL ' + Math.max(0, Math.round(h.hp / h.max * 100)) + '%';
+      if (h.hp <= 0) {
+        spawnBurst(h.x, 2, h.z, 0xffa040, 26); GH.audio.explode();
+        dyn.haulerMesh.visible = false;
+        dyn.failLine = 'THE HAULER BURNS'; finishDyn(false); return;
+      }
+      // a caravan nobody escorts leaves without you
+      dyn.idleT = near ? 0 : dyn.idleT + dt;
+      if (dyn.idleT > 90) { dyn.failLine = 'THE CARAVAN LEFT WITHOUT YOU'; finishDyn(false); return; }
+    } else if (dyn.kind === 'hold') {
+      dyn.waveT -= dt;
+      if (dyn.waveT <= 0 && dyn.spawned < dyn.need) {
+        dyn.waveT = 7;
+        var n = Math.min(dyn.need - dyn.spawned, 3 + dz);
+        for (var i = 0; i < n; i++) {
+          var ha = Math.random() * Math.PI * 2, hr = 16 + Math.random() * 8;
+          var he = spawnEnemy(GH.weightedPick(wavePlan.types).id, dyn.x + Math.cos(ha) * hr, dyn.z + Math.sin(ha) * hr);
+          if (he) { he.aggro = true; he.event = true; he.dynAttacker = true; dyn.spawned++; }
+        }
+      }
+      // attackers at the veil tear it
+      var atVeil = 0;
+      for (var ai = 0; ai < enemies.length; ai++) {
+        var av = enemies[ai];
+        if (!av.dead && av.dynAttacker && GH.dist2(av.x, av.z, dyn.x, dyn.z) < 5 * 5) atVeil++;
+      }
+      dyn.integrity -= Math.min(atVeil, 5) * 0.012 * dt * (1 + dz * 0.25);
+      if (dyn.gate.mesh && dyn.gate.mesh.userData.veil) dyn.gate.mesh.userData.veil.material.color.setHex(atVeil ? 0xff6040 : 0x60c8ff);
+      dyn.progress = dyn.kills / dyn.need;
+      dyn.meta = 'VEIL ' + Math.max(0, Math.round(dyn.integrity * 100)) + '%';
+      if (dyn.kills >= dyn.need) { if (dyn.gate.mesh && dyn.gate.mesh.userData.veil) dyn.gate.mesh.userData.veil.material.color.setHex(0x60c8ff); finishDyn(true); return; }
+      if (dyn.integrity <= 0) { if (dyn.gate.mesh && dyn.gate.mesh.userData.veil) dyn.gate.mesh.userData.veil.material.color.setHex(0x60c8ff); dyn.failLine = 'THE VEIL TORE'; finishDyn(false); return; }
+    } else if (dyn.kind === 'beacons') {
+      var lit = 0, nextB = null;
+      dyn.beacons.forEach(function (b) {
+        if (b.lit) lit++; else if (!nextB) nextB = b;
+        if (b.lit) b.mesh.userData.lamp.scale.setScalar(1 + Math.sin(runTime * 5) * 0.15);
+      });
+      if (nextB) { dyn.x = nextB.x; dyn.z = nextB.z; if (dyn.marker) dyn.marker.position.set(dyn.x, gy(dyn.x, dyn.z), dyn.z); }
+      dyn.progress = lit / 3;
+      dyn.meta = lit + '/3 LIT';
+      if (lit >= 3) { finishDyn(true); return; }
+      if (dyn.t > dyn.limit) { dyn.failLine = 'THE BEACONS GUTTERED'; finishDyn(false); return; }
+    } else if (dyn.kind === 'nest') {
+      var w2 = GH.meta.data.world;
+      if (w2.nests[dyn.nest.id]) { dyn.progress = 1; finishDyn(true); return; }
+      var core = null;
+      for (var ci = 0; ci < enemies.length; ci++) if (enemies[ci].nestId === dyn.nest.id && !enemies[ci].dead) core = enemies[ci];
+      dyn.progress = core ? 1 - core.hp / core.maxHp : 0;
+      dyn.meta = core ? 'CORE ' + Math.round(core.hp / core.maxHp * 100) + '%' : 'CORE INTACT';
+      if (dyn.t > dyn.limit) { clearDyn(); scheduleDyn(30); return; }
+    }
+    dyn.dist = dp;
+    renderDynPanel();
+  }
+
+  function bearingArrow(dx, dz) {
+    // z grows southward: north is -z
+    var a = Math.atan2(dx, -dz); // 0 = north, clockwise positive
+    var idx = Math.round(a / (Math.PI / 4));
+    return ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'][((idx % 8) + 8) % 8];
+  }
+  function renderDynPanel() {
+    dynDomT -= 1;
+    if (dynDomT > 0) return;
+    dynDomT = 6;
+    var ep = document.getElementById('event-panel');
+    if (!ep) return;
+    if (!dyn) { ep.classList.add('hidden'); return; }
+    ep.classList.remove('hidden');
+    ep.classList.toggle('failing', !!dyn.failed || (dyn.kind === 'hold' && dyn.integrity < 0.35));
+    ep.classList.toggle('done', !!dyn.done && !dyn.failed);
+    document.getElementById('ev-title').textContent = (dyn.done ? (dyn.failed ? 'FAILED — ' : 'COMPLETE — ') : '') + dyn.title;
+    document.getElementById('ev-line').textContent = dyn.done ? (dyn.failed ? (dyn.failLine || '') : '+' + dyn.pay + ' salvage, alloy and a little experience.') : dyn.line;
+    document.getElementById('ev-fill').style.width = GH.clamp((dyn.progress || 0) * 100, 0, 100) + '%';
+    var left = dyn.limit ? Math.max(0, dyn.limit - dyn.t) : null;
+    var dist = dyn.dist !== undefined ? Math.round(dyn.dist) + ' M ' + bearingArrow(dyn.x - player.x, dyn.z - player.z) : '';
+    document.getElementById('ev-meta').innerHTML = '<span>' + (dyn.meta || '') + '</span><span>' +
+      (dyn.done ? '' : dist + (left !== null ? ' · <b>' + Math.ceil(left) + 's</b>' : '')) + '</span>';
+  }
+  function lightBeacon(it) {
+    if (!dyn || dyn.kind !== 'beacons' || dyn.done || it.beacon.lit) return;
+    it.beacon.lit = true;
+    it.done = true;
+    it.beacon.mesh.userData.lamp.material.color.setHex(0xffb040);
+    spawnBurst(it.x, 6, it.z, 0xffb040, 18);
+    GH.audio.levelup();
+    var lit = dyn.beacons.filter(function (b) { return b.lit; }).length;
+    announce('BEACON LIT — ' + lit + '/3', 24);
+    for (var i = 0; i < 2 + zoneNow.danger; i++) {
+      var a = Math.random() * Math.PI * 2;
+      var e = spawnEnemy(GH.weightedPick(wavePlan.types).id, it.x + Math.cos(a) * GH.rand(7, 11), it.z + Math.sin(a) * GH.rand(7, 11));
+      if (e) { e.aggro = true; e.event = true; e.dynAttacker = true; }
+    }
+  }
+  function scavengeHulk(it) {
+    it.done = true;
+    var dz = zoneNow ? zoneNow.danger : 1;
+    var pay = 12 * dz + Math.floor(Math.random() * 10);
+    coinsRun += pay;
+    grantMats(3 + 2 * dz, 0, true);
+    spawnBurst(it.x, 1.5, it.z, 0xd0c0a0, 14);
+    GH.audio.gem();
+    if (Math.random() < 0.3) {
+      announce('SCAVENGED +' + pay + ' SALVAGE — YOU WERE NOT THE FIRST HERE', 24);
+      for (var i = 0; i < 2 + dz; i++) {
+        var a = Math.random() * Math.PI * 2;
+        var e = spawnEnemy(GH.weightedPick(wavePlan.types).id, it.x + Math.cos(a) * GH.rand(6, 10), it.z + Math.sin(a) * GH.rand(6, 10));
+        if (e) { e.aggro = true; e.event = true; }
+      }
+    } else {
+      announce('SCAVENGED +' + pay + ' SALVAGE, +' + (3 + 2 * dz) + ' ALLOY', 24);
+    }
+  }
+  G.devDyn = function (kind) { if (dyn) clearDyn(); return startDyn(kind); };
+
+  // =================================================================
+  // COMBAT FEEL — the small answers that make a fight talk back.
+  // EVADE: a boost dash through an attack was already untouchable; now it
+  // says so, and pays a little meter back (GW2's dodge). CHAIN: kills in
+  // quick succession stack an arcade multiplier on experience and pay out
+  // at milestones (the Gun Metal scoreboard). TRANSFORM BURST: changing
+  // form is itself a move — a shockwave, a half second of hull immunity.
+  // =================================================================
+  function onEvade() {
+    if (player.evadedDash === player.dashId) return;
+    player.evadedDash = player.dashId;
+    G.dmg.spawn(player.x, 2.9, player.z, 'EVADE', 'heal', 16);
+    player.boost = Math.min(1, player.boost + 0.2);
+    player.energy = Math.min(player.stats.energyMax, player.energy + player.stats.energyMax * 0.15);
+    GH.audio.block();
+    G.hitStop(0.03);
+    spawnBurst(player.x, 1.2, player.z, 0xa0e0ff, 6);
+  }
+  function chainMult() { return 1 + Math.min(chain.n, 25) * 0.02; }
+  function onChainKill(e) {
+    chain.n++;
+    chain.t = 4.0;
+    if (chain.n > chain.best) chain.best = chain.n;
+    var marks = [5, 10, 20, 35, 50, 75, 100];
+    if (marks.indexOf(chain.n) !== -1) {
+      var dz = zoneNow ? zoneNow.danger : 1;
+      var bonus = chain.n * dz;
+      coinsRun += bonus;
+      player.heal(player.stats.maxHP * 0.05);
+      announce('CHAIN ×' + chain.n + ' — +' + bonus + ' SALVAGE', 28);
+      GH.audio.win();
+      G.hitStop(0.05);
+    }
+  }
+  var chainDomN = -1;
+  function updateChain(dt) {
+    if (chain.n > 0) {
+      chain.t -= dt;
+      if (chain.t <= 0) { chain.n = 0; chain.t = 0; }
+    }
+    var cp = document.getElementById('chain-panel');
+    if (!cp) return;
+    if (chain.n < 2) { if (chainDomN !== 0) { cp.classList.add('hidden'); chainDomN = 0; } return; }
+    cp.classList.remove('hidden');
+    if (chainDomN !== chain.n) {
+      chainDomN = chain.n;
+      var ct = document.getElementById('chain-text');
+      ct.textContent = 'CHAIN ×' + chain.n + '  +' + Math.round((chainMult() - 1) * 100) + '% XP';
+      ct.classList.toggle('hot', chain.n >= 10);
+    }
+    document.getElementById('chain-fill').style.width = GH.clamp(chain.t / 4.0 * 100, 0, 100) + '%';
+  }
+  function transformBurst() {
+    if (!expActive && G.mode !== 'expedition' && G.state !== 'play') return;
+    var s = player.stats;
+    for (var i = 0; i < enemies.length; i++) {
+      var e = enemies[i];
+      if (e.dead || e.def.boss) continue;
+      if (GH.dist2(player.x, player.z, e.x, e.z) < 5.5 * 5.5) {
+        var a = GH.angleTo(player.x, player.z, e.x, e.z);
+        e.vx += Math.sin(a) * 16 / e.def.mass; e.vz += Math.cos(a) * 16 / e.def.mass;
+        e.stun = Math.max(e.stun || 0, 0.35);
+      }
+    }
+    var rw = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.2, 24),
+      new THREE.MeshBasicMaterial({ color: 0x70c0ff, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide }));
+    rw.rotation.x = -Math.PI / 2;
+    rw.position.set(player.x, 0.35 + gy(player.x, player.z), player.z);
+    scene.add(rw);
+    effects.push({ kind: 'ringwaveFx', mesh: rw, t: 0.45, total: 0.45, x: player.x, z: player.z, maxR: 5.5,
+      dmg: 4 * s.damageMult, inst: player.weapons[0], elem: null, hitSet: [] });
+    player.shieldT = Math.max(player.shieldT || 0, 0.5);
+  }
+
+  // WAYPOINTS — travel from the WORLD MAP to any territory you have stood
+  // in, for salvage (GW2's waypoints; the portals remain the free road)
+  G.waypointCost = function (zoneId) { return 20 * GH.world.zoneById(zoneId).danger; };
+  G.waypointTo = function (zoneId) {
+    if (!expActive || !player) return { ok: false, why: 'NOT IN THE REACH' };
+    if (zoneNow && zoneNow.dungeon) return { ok: false, why: 'NOT FROM INSIDE A DUNGEON' };
+    if (siege || cipherRun || (dungeonState && !dungeonState.done)) return { ok: false, why: 'FINISH WHAT YOU STARTED FIRST' };
+    var w = GH.meta.data.world; w.visited = w.visited || {};
+    if (!GH.world.gridOf(zoneId)) return { ok: false, why: 'NO SUCH TERRITORY' };
+    if (!w.visited[zoneId]) return { ok: false, why: 'UNEXPLORED — WALK THERE FIRST' };
+    if (zoneId === curZone) return { ok: false, why: 'YOU ARE ALREADY HERE' };
+    var cost = G.waypointCost(zoneId);
+    if (GH.meta.data.salvage < cost) return { ok: false, why: 'NEED ' + cost + ' SALVAGE (BANK AT CAMP)' };
+    GH.meta.data.salvage -= cost;
+    loadZone(zoneId, null);
+    var gates = travelGates();
+    if (gates.length) {
+      var g0 = gates[0];
+      var ina = Math.atan2(-g0.x, -g0.z);
+      player.x = g0.x + Math.sin(ina) * 9; player.z = g0.z + Math.cos(ina) * 9;
+      player.facing = ina; camYaw = ina;
+      if (player.drive) player.drive.heading = ina;
+    } else { player.x = 0; player.z = 0; }
+    var sp = openSpot(player.x, player.z, 0.8); if (sp) { player.x = sp.x; player.z = sp.z; }
+    camGround = gy(player.x, player.z);
+    travelCd = 2;
+    if (mate) { mate.x = player.x + 2; mate.z = player.z + 1.5; }
+    zoneFade('WAYPOINT · −' + cost + ' SALVAGE', zoneNow.name);
+    announce(zoneNow.name + ' — DANGER ' + ['I', 'II', 'III', 'IV'][zoneNow.danger - 1], 28);
+    saveExpedition();
+    return { ok: true };
   };
 
   // dev/test helper: jump the pilot somewhere (harmless outside dev use)
@@ -21924,6 +22466,13 @@ GH.crt = (function () {
     for (var c in nbs) if (nbs[c]) nextSet[nbs[c]] = GH.world.CORNERS[c];
     var hd = GH.meta.data.huntsToday || { day: null, slain: {} };
     var todaySlain = hd.day === GH.world.dayStamp() ? hd.slain : {};
+    var visited = GH.meta.data.world.visited || {};
+    var flash = document.getElementById('map-flash');
+    if (!flash) {
+      flash = document.createElement('div'); flash.id = 'map-flash';
+      host.parentNode.insertBefore(flash, host);
+    }
+    flash.textContent = cur ? 'WAYPOINT: click a territory you have stood in to travel there for salvage.' : '';
     for (var row = -2; row <= 2; row++) {
       for (var col = -2; col <= 2; col++) {
         var id = null;
@@ -21934,10 +22483,23 @@ GH.crt = (function () {
         var zn = GH.world.zoneById(id);
         tile.className = 'mg-tile' + (id === 'wreck' ? ' hub' : '') + (id === curParent ? ' here' : '') + (nextSet[id] ? ' next' : '');
         var hunt = GH.bosses.todayFor(id, GH.world.dayStamp(), todaySlain);
+        var canWp = !!(cur && visited[id] && id !== curParent && GH.game.waypointTo);
+        var wpLine = canWp ? '<div class="mg-wp">WAYPOINT · ' + GH.game.waypointCost(id) + ' S</div>'
+          : (!visited[id] && id !== curParent ? '<div class="mg-unx">UNEXPLORED</div>' : '');
         tile.innerHTML = '<div>' + (nextSet[id] ? '<span style="color:#60c8ff">' + nextSet[id].arrow + '</span> ' : '') + st.name + '</div>' +
-          '<div class="mg-danger">DANGER ' + ['I', 'II', 'III', 'IV'][zn.danger - 1] + '</div>' +
+          '<div class="mg-danger">DANGER ' + ['I', 'II', 'III', 'IV'][zn.danger - 1] + '</div>' + wpLine +
           (hunt ? '<span class="mg-hunt" title="' + hunt.name + '">☠</span>' : '');
         tile.title = st.biome || st.name;
+        if (canWp) {
+          tile.classList.add('wp');
+          tile.onclick = (function (zid) {
+            return function () {
+              var r = GH.game.waypointTo(zid);
+              if (r.ok) resumeExpedition();
+              else { GH.audio.hit(); flash.textContent = r.why; }
+            };
+          })(id);
+        }
         host.appendChild(tile);
       }
     }

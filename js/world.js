@@ -860,6 +860,11 @@ GH.world = (function () {
     if (layout.relic) {
       list.push({ kind: 'relic', x: layout.relic.x, z: layout.relic.z, label: 'SEIZE THE RELIC (THE ALARM WILL SOUND)' });
     }
+    // crashed hulks can be picked over once per visit: salvage, alloy, and
+    // now and then whatever was already picking over them
+    (layout.ruins || []).forEach(function (rn) {
+      if (rn.kind === 'hulk') list.push({ kind: 'hulk', x: rn.x, z: rn.z, label: 'SCAVENGE THE HULK' });
+    });
     return list;
   };
 

@@ -93,6 +93,7 @@ GH.meta = (function () {
         raceBest: 0,        // best circuit time in ms (0 = none)
         duelWins: 0,
         harrowDay: null,    // date stamp of the last day THE HARROW fell
+        visited: {},        // zone id -> true (stood in it; unlocks its WAYPOINT)
         fac: null           // houses: reputation, stains, pledge, banner (see factions.js)
       },
       // pilot skill tree: nodeId -> rank, plus unspent points and the

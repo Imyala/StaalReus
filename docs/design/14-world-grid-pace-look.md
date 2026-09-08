@@ -97,3 +97,39 @@ touch more contrast and saturation, warm lights and cool shadows, a soft highlig
 vignette — no scanlines, mask or curvature. The tube is still there: CONTROLS → Screen look offers
 Film (default), CRT subtle, CRT strong; **H** still toggles the pass. Saved control profiles from
 before this round move onto Film once (`settings.look = 2`).
+
+## 5. Interactivity round: dynamic events, waypoints, combat feel
+
+**Dynamic events (`startDyn` / `updateDyn` in `js/game.js`).** Every territory now rolls a
+location-based event every minute or so, GW2-style: a place is marked with an orange ring and a
+column of light, the minimap shows a pulsing ring, and a tracker panel on the right names the job
+with a progress bar, a timer, and distance plus a bearing arrow. Four kinds:
+
+| Event | What happens | Fail | Pay (× danger) |
+|---|---|---|---|
+| ESCORT THE HAULER | a hauler rolls from the nearest portal toward the heart along seven waypoints; it only rolls while you are within 30 units; ambushes at waypoints 2 and 5 | hull 0, or nobody escorts it for 90 s | 55 |
+| HOLD THE … PORTAL | waves of hostiles push one of the two nearest corner portals; attackers standing in the veil tear it; kill 8 + 3·danger before it is gone | veil 0% | 45 |
+| RELIGHT THE BEACONS | three dark beacons within 60 units; stand at each and press F; each one lit wakes 2 + danger hostiles | 80 s | 40 |
+| BOUNTY — BREAK THE NEST | the nearest live nest is called out; progress is its core's hull | quietly expires after 150 s | 35 |
+
+Success also grants alloy, a chance at a core, pilot XP, a house deed and a diary tick (`events`).
+Events never overlap sieges, vault trials, the built territories' zone events or Zero Hour; the
+zone events wait for a dynamic one to finish. `GH.game.devDyn(kind)` forces one for testing.
+
+**Waypoints.** Standing in a territory records it (`world.visited`). On the WORLD MAP, a visited
+territory's tile reads WAYPOINT and can be clicked to travel there for 20 × danger salvage from the
+bank; you arrive at its first portal, facing inward. Portals remain the free road. Blocked inside
+dungeons, sieges and trials.
+
+**Scavenge.** Each territory's crashed hulk can be picked over once per visit (F): salvage and alloy,
+and three times in ten the scavengers who got there first.
+
+**Combat feel.**
+- *EVADE*: a boost dash through an attack was already untouchable for its first 0.1 s; it now says
+  EVADE, refunds 20% boost and 15% energy, and freezes a frame — once per dash.
+- *CHAIN*: kills within 4 s of each other stack an arcade multiplier (+2% XP per link, cap 25) shown
+  under the target panel with a decay bar; ×5, ×10, ×20, ×35, ×50, ×75, ×100 pay `chain × danger`
+  salvage and mend 5% hull.
+- *TRANSFORM BURST*: changing form fires a 5.5-unit shockwave (knockback, 0.35 s stagger, a chip
+  of damage) and grants half a second of hull immunity — the Gun Metal habit of transforming as a
+  move rather than a menu.
